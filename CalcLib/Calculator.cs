@@ -1,4 +1,5 @@
-﻿using CalcLib.Tokens;
+﻿using CalcLib.Expressions;
+using CalcLib.Tokens;
 
 namespace CalcLib;
 
@@ -19,9 +20,4 @@ public class Calculator
         Console.WriteLine(Expression.ToPostFix());
         return Expression.Calc();
     }
-
-    //public double InternalCompute(TokenizedExpression expr)
-    //{
-    //    expr.Get
-    //}
 }

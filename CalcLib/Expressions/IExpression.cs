@@ -2,7 +2,7 @@
 
 namespace CalcLib.Expressions;
 
-//Test
+//TODO: See if there is a better way to handle this as declaring IExpression : ICalcToken
 public interface IExpression : ICalcToken
 {
     double Calc();

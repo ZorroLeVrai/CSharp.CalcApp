@@ -140,7 +140,7 @@ public class ReplTests
     {
         var help = HelpOutput();
 
-        foreach (var symbol in new[] { "+", "-", "*", "/", "^", "(", ")" })
+        foreach (var symbol in new[] { "+", "-", "*", "/", "%", "^", "(", ")" })
         {
             Assert.Contains(symbol, help);
         }
@@ -259,6 +259,27 @@ public class ReplTests
     public void Run_UnaryMinus(string line, string expected)
     {
         Assert.Equal($"> {expected}\n> ", Run(line + "\nquit\n"));
+    }
+
+    [Theory]
+    [InlineData("7%3", "1")]
+    [InlineData("-7%3", "-1")]
+    [InlineData("5.5%2", "1.5")]
+    [InlineData("10%4%3", "2")]
+    [InlineData("2+7%4", "5")]
+    public void Run_Modulo(string line, string expected)
+    {
+        Assert.Equal($"> {expected}\n> ", Run(line + "\nquit\n"));
+    }
+
+    [Fact]
+    public void Run_ModuloByZeroPrintsAnErrorAndTheLoopContinues()
+    {
+        var output = Run("5%0\n7%3\nquit\n");
+
+        var lines = output.Split('\n');
+        Assert.Equal("> Error: Division by zero", lines[0]);
+        Assert.Equal("> 1", lines[1]);
     }
 
     [Fact]

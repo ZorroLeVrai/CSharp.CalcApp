@@ -25,6 +25,7 @@ internal static class Evaluator
             Operator.Mul => left * right,
             Operator.Div => Divide(left, right),
             Operator.Pow => Power(left, right),
+            Operator.Mod => Remainder(left, right),
             _ => throw new ArgumentOutOfRangeException(nameof(op), op, "Unknown operator"),
         };
 
@@ -39,6 +40,13 @@ internal static class Evaluator
         right == 0
             ? throw new CalcException(CalcErrorKind.DivisionByZero)
             : left / right;
+
+    // C#'s % on doubles: the result takes the sign of the left operand (-7 % 3 is -1). A zero divisor
+    // would give NaN, so it is reported as a division by zero instead.
+    private static double Remainder(double left, double right) =>
+        right == 0
+            ? throw new CalcException(CalcErrorKind.DivisionByZero)
+            : left % right;
 
     private static double Power(double baseValue, double exponent)
     {

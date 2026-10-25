@@ -35,6 +35,9 @@ public class EvaluatorTests
     [InlineData(Operator.Div, 9, 3, 3)]
     [InlineData(Operator.Div, -9, 3, -3)]
     [InlineData(Operator.Pow, 2, 10, 1024)]
+    [InlineData(Operator.Mod, 7, 3, 1)]
+    [InlineData(Operator.Mod, 6, 3, 0)]
+    [InlineData(Operator.Mod, 2, 5, 2)]
     public void Evaluate_EachOperator(Operator op, double left, double right, double expected)
     {
         Assert.Equal(expected, Evaluator.Evaluate(B(op, N(left), N(right))));
@@ -117,6 +120,108 @@ public class EvaluatorTests
             B(Operator.Mul, N(2), B(Operator.Add, N(3), B(Operator.Div, N(4), N(0)))));
 
         var ex = Assert.Throws<CalcException>(() => Evaluator.Evaluate(tree));
+
+        Assert.Equal(CalcErrorKind.DivisionByZero, ex.Kind);
+    }
+
+    // the remainder takes the sign of the left operand (C# `%`, not a mathematical modulo)
+    [Theory]
+    [InlineData(7, 3, 1)]
+    [InlineData(-7, 3, -1)]
+    [InlineData(7, -3, 1)]
+    [InlineData(-7, -3, -1)]
+    [InlineData(5.5, 2, 1.5)]
+    [InlineData(-5.5, 2, -1.5)]
+    [InlineData(1, 4, 1)]
+    [InlineData(0, 5, 0)]
+    [InlineData(10, 5, 0)]
+    [InlineData(0.5, 0.25, 0)]
+    [InlineData(5, double.PositiveInfinity, 5)]
+    [InlineData(-5, double.PositiveInfinity, -5)]
+    public void Evaluate_Modulo(double left, double right, double expected)
+    {
+        var result = Evaluator.Evaluate(B(Operator.Mod, N(left), N(right)));
+
+        Assert.Equal(expected, result, Precision);
+    }
+
+    [Fact]
+    public void Evaluate_ModuloOfDecimals_IsApproximate()
+    {
+        // 0.5 % 0.2 is 0.1 up to floating-point noise
+        var result = Evaluator.Evaluate(B(Operator.Mod, N(0.5), N(0.2)));
+
+        Assert.Equal(0.1, result, Precision);
+    }
+
+    [Theory]
+    [InlineData(5, 0)]
+    [InlineData(-5, 0)]
+    [InlineData(0, 0)]
+    [InlineData(5, -0.0)]
+    [InlineData(double.PositiveInfinity, 0)]
+    public void Evaluate_ModuloByZero_IsDivisionByZero(double left, double right)
+    {
+        var ex = Assert.Throws<CalcException>(() => Evaluator.Evaluate(B(Operator.Mod, N(left), N(right))));
+
+        Assert.Equal(CalcErrorKind.DivisionByZero, ex.Kind);
+    }
+
+    [Fact]
+    public void Evaluate_NestedModuloByZero_IsDivisionByZero()
+    {
+        // 5%(2-2)
+        var tree = B(Operator.Mod, N(5), B(Operator.Sub, N(2), N(2)));
+
+        var ex = Assert.Throws<CalcException>(() => Evaluator.Evaluate(tree));
+
+        Assert.Equal(CalcErrorKind.DivisionByZero, ex.Kind);
+    }
+
+    [Theory]
+    [InlineData(double.PositiveInfinity, 3)]
+    [InlineData(double.NegativeInfinity, 3)]
+    public void Evaluate_ModuloOfInfinity_IsADomainError(double left, double right)
+    {
+        var ex = Assert.Throws<CalcException>(() => Evaluator.Evaluate(B(Operator.Mod, N(left), N(right))));
+
+        Assert.Equal(CalcErrorKind.DomainError, ex.Kind);
+    }
+
+    [Theory]
+    [InlineData("7%3", 1)]
+    [InlineData("-7%3", -1)]
+    [InlineData("7%-3", 1)]
+    [InlineData("-7%-3", -1)]
+    [InlineData("-(7%3)", -1)]
+    [InlineData("(-7)%3", -1)]
+    [InlineData("10%4%3", 2)]
+    [InlineData("10/4%3", 2.5)]
+    [InlineData("2*7%4", 2)]
+    [InlineData("7%4*2", 6)]
+    [InlineData("2+7%4", 5)]
+    [InlineData("7%4-2", 1)]
+    [InlineData("2^3%5", 3)]
+    [InlineData("2%3^2", 2)]
+    [InlineData("(2+7)%4", 1)]
+    [InlineData("7 % 3", 1)]
+    [InlineData("5.5%2", 1.5)]
+    [InlineData("100%7%5", 2)]
+    public void Evaluate_ModuloFromSource(string input, double expected)
+    {
+        Assert.Equal(expected, EvalSource(input), Precision);
+    }
+
+    [Theory]
+    [InlineData("5%0")]
+    [InlineData("-5%0")]
+    [InlineData("0%0")]
+    [InlineData("5%(3-3)")]
+    [InlineData("5%-0")]
+    [InlineData("1+5%0")]
+    public void Evaluate_ModuloByZeroFromSource_Throws(string input)
+    {
+        var ex = Assert.Throws<CalcException>(() => EvalSource(input));
 
         Assert.Equal(CalcErrorKind.DivisionByZero, ex.Kind);
     }

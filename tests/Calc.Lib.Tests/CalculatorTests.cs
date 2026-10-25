@@ -45,6 +45,47 @@ public class CalculatorTests
         Assert.Equal(expected, Calculator.Evaluate(input), Precision);
     }
 
+    [Theory]
+    [InlineData("7%3", 1)]
+    [InlineData("-7%3", -1)]
+    [InlineData("7%-3", 1)]
+    [InlineData("10%4%3", 2)]
+    [InlineData("2+7%4", 5)]
+    [InlineData("2*7%4", 2)]
+    [InlineData("(2+7)%4", 1)]
+    [InlineData("2^3%5", 3)]
+    [InlineData("5.5%2", 1.5)]
+    [InlineData("7 % 3", 1)]
+    [InlineData("6%3", 0)]
+    public void Evaluate_Modulo(string input, double expected)
+    {
+        Assert.Equal(expected, Calculator.Evaluate(input), Precision);
+    }
+
+    [Theory]
+    [InlineData("5%0", CalcErrorKind.DivisionByZero)]
+    [InlineData("5%(2-2)", CalcErrorKind.DivisionByZero)]
+    [InlineData("5%", CalcErrorKind.UnexpectedEnd)]
+    [InlineData("%5", CalcErrorKind.UnexpectedToken)]
+    [InlineData("5%%2", CalcErrorKind.UnexpectedToken)]
+    [InlineData("5%*2", CalcErrorKind.UnexpectedToken)]
+    [InlineData("(5%)", CalcErrorKind.UnexpectedToken)]
+    public void Evaluate_ModuloErrors(string input, CalcErrorKind expected)
+    {
+        var ex = Assert.Throws<CalcException>(() => Calculator.Evaluate(input));
+
+        Assert.Equal(expected, ex.Kind);
+    }
+
+    [Fact]
+    public void Evaluate_ModuloOverflowingOperand_IsADomainError()
+    {
+        // 10^400 is infinity, and infinity % 3 is not a number
+        var ex = Assert.Throws<CalcException>(() => Calculator.Evaluate("10^400%3"));
+
+        Assert.Equal(CalcErrorKind.DomainError, ex.Kind);
+    }
+
     [Fact]
     public void Evaluate_NegativeBaseWrittenWithUnaryMinus_IsReal()
     {

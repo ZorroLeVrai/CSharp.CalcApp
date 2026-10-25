@@ -73,6 +73,7 @@ internal static class Tokenizer
             case '*': op = Operator.Mul; return true;
             case '/': op = Operator.Div; return true;
             case '^': op = Operator.Pow; return true;
+            case '%': op = Operator.Mod; return true;
             default: op = default; return false;
         }
     }

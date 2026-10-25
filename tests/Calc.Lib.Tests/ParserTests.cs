@@ -22,6 +22,7 @@ public class ParserTests
     [InlineData(Operator.Mul)]
     [InlineData(Operator.Div)]
     [InlineData(Operator.Pow)]
+    [InlineData(Operator.Mod)]
     public void Parse_SingleOperation(Operator op)
     {
         var expr = Parser.Parse([Num(6), Op(op), Num(2)]);
@@ -60,6 +61,7 @@ public class ParserTests
     [InlineData(Operator.Mul)]
     [InlineData(Operator.Div)]
     [InlineData(Operator.Pow)]
+    [InlineData(Operator.Mod)]
     public void Parse_OperatorFirst_Throws(Operator op)
     {
         var ex = Assert.Throws<CalcException>(() => Parser.Parse([Op(op), Num(2)]));
@@ -193,6 +195,120 @@ public class ParserTests
                 B(Operator.Mul, N(2), B(Operator.Pow, N(3), B(Operator.Pow, N(4), N(5))))),
             N(6));
         Assert.Equal(expected, expr);
+    }
+
+    [Fact]
+    public void Parse_ModuloBindsTighterThanAddition_OnTheRight()
+    {
+        // 2+7%4
+        var expr = Parser.Parse([Num(2), Op(Operator.Add), Num(7), Op(Operator.Mod), Num(4)]);
+
+        Assert.Equal(B(Operator.Add, N(2), B(Operator.Mod, N(7), N(4))), expr);
+    }
+
+    [Fact]
+    public void Parse_ModuloBindsTighterThanSubtraction_OnTheLeft()
+    {
+        // 7%4-2
+        var expr = Parser.Parse([Num(7), Op(Operator.Mod), Num(4), Op(Operator.Sub), Num(2)]);
+
+        Assert.Equal(B(Operator.Sub, B(Operator.Mod, N(7), N(4)), N(2)), expr);
+    }
+
+    [Fact]
+    public void Parse_ModuloIsLeftAssociative()
+    {
+        // 10%4%3
+        var expr = Parser.Parse([Num(10), Op(Operator.Mod), Num(4), Op(Operator.Mod), Num(3)]);
+
+        Assert.Equal(B(Operator.Mod, B(Operator.Mod, N(10), N(4)), N(3)), expr);
+    }
+
+    [Fact]
+    public void Parse_ModuloSharesALevelWithMultiplication_LeftToRight()
+    {
+        // 2*7%4 is (2*7)%4
+        var expr = Parser.Parse([Num(2), Op(Operator.Mul), Num(7), Op(Operator.Mod), Num(4)]);
+
+        Assert.Equal(B(Operator.Mod, B(Operator.Mul, N(2), N(7)), N(4)), expr);
+    }
+
+    [Fact]
+    public void Parse_ModuloSharesALevelWithMultiplication_WhenModuloComesFirst()
+    {
+        // 7%4*2 is (7%4)*2
+        var expr = Parser.Parse([Num(7), Op(Operator.Mod), Num(4), Op(Operator.Mul), Num(2)]);
+
+        Assert.Equal(B(Operator.Mul, B(Operator.Mod, N(7), N(4)), N(2)), expr);
+    }
+
+    [Fact]
+    public void Parse_ModuloSharesALevelWithDivision_LeftToRight()
+    {
+        // 10/4%3 is (10/4)%3
+        var expr = Parser.Parse([Num(10), Op(Operator.Div), Num(4), Op(Operator.Mod), Num(3)]);
+
+        Assert.Equal(B(Operator.Mod, B(Operator.Div, N(10), N(4)), N(3)), expr);
+    }
+
+    [Fact]
+    public void Parse_PowerBindsTighterThanModulo_OnTheLeft()
+    {
+        // 2^3%5 is (2^3)%5
+        var expr = Parser.Parse([Num(2), Op(Operator.Pow), Num(3), Op(Operator.Mod), Num(5)]);
+
+        Assert.Equal(B(Operator.Mod, B(Operator.Pow, N(2), N(3)), N(5)), expr);
+    }
+
+    [Fact]
+    public void Parse_PowerBindsTighterThanModulo_OnTheRight()
+    {
+        // 2%3^2 is 2%(3^2)
+        var expr = Parser.Parse([Num(2), Op(Operator.Mod), Num(3), Op(Operator.Pow), Num(2)]);
+
+        Assert.Equal(B(Operator.Mod, N(2), B(Operator.Pow, N(3), N(2))), expr);
+    }
+
+    [Fact]
+    public void Parse_ModuloWithUnaryMinusOnTheLeft_NegatesOnlyTheLeftOperand()
+    {
+        // -7%3 is (-7)%3
+        var expr = Parser.Parse([Op(Operator.Sub), Num(7), Op(Operator.Mod), Num(3)]);
+
+        Assert.Equal(B(Operator.Mod, Neg(N(7)), N(3)), expr);
+    }
+
+    [Fact]
+    public void Parse_ModuloWithUnaryMinusOnTheRight()
+    {
+        // 7%-3
+        var expr = Parser.Parse([Num(7), Op(Operator.Mod), Op(Operator.Sub), Num(3)]);
+
+        Assert.Equal(B(Operator.Mod, N(7), Neg(N(3))), expr);
+    }
+
+    [Fact]
+    public void Parse_ModuloWithParentheses()
+    {
+        // (2+7)%4
+        var expr = Parser.Parse(
+            [LParen(), Num(2), Op(Operator.Add), Num(7), RParen(), Op(Operator.Mod), Num(4)]);
+
+        Assert.Equal(B(Operator.Mod, B(Operator.Add, N(2), N(7)), N(4)), expr);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void Parse_DanglingModulo_Throws(int dangling)
+    {
+        // 7% and 7%%
+        var tokens = new List<Token> { Num(7) };
+        tokens.AddRange(Enumerable.Repeat<Token>(Op(Operator.Mod), dangling));
+
+        var ex = Assert.Throws<CalcException>(() => Parser.Parse(tokens));
+
+        Assert.Equal(dangling == 1 ? CalcErrorKind.UnexpectedEnd : CalcErrorKind.UnexpectedToken, ex.Kind);
     }
 
     private static LeftParenToken LParen() => new();
@@ -412,6 +528,7 @@ public class ParserTests
     [InlineData(Operator.Mul)]
     [InlineData(Operator.Div)]
     [InlineData(Operator.Pow)]
+    [InlineData(Operator.Mod)]
     public void Parse_LongChainOf1024Operators_DoesNotOverflow(Operator op)
     {
         var tokens = LongChain(1024, _ => op);
@@ -424,7 +541,7 @@ public class ParserTests
     [Fact]
     public void Parse_LongChainOf1024MixedOperators_DoesNotOverflow()
     {
-        Operator[] cycle = [Operator.Add, Operator.Sub, Operator.Mul, Operator.Div, Operator.Pow];
+        Operator[] cycle = [Operator.Add, Operator.Sub, Operator.Mul, Operator.Div, Operator.Pow, Operator.Mod];
         var tokens = LongChain(1024, i => cycle[i % cycle.Length]);
 
         var expr = Parser.Parse(tokens);
@@ -448,6 +565,7 @@ public class ParserTests
     [InlineData(Operator.Mul)]
     [InlineData(Operator.Div)]
     [InlineData(Operator.Pow)]
+    [InlineData(Operator.Mod)]
     public void Parse_ChainOf1025Operators_IsTooDeep(Operator op)
     {
         var ex = Assert.Throws<CalcException>(() => Parser.Parse(LongChain(1025, _ => op)));
@@ -655,6 +773,7 @@ public class ParserTests
     [InlineData(Operator.Div)]
     [InlineData(Operator.Add)]
     [InlineData(Operator.Sub)]
+    [InlineData(Operator.Mod)]
     public void Parse_UnaryMinusBindsTighterThanTheOtherBinaryOperators(Operator op)
     {
         // -2*3, -2/3, -2+3, -2-3: only the 2 is negated
@@ -779,6 +898,7 @@ public class ParserTests
     [InlineData(Operator.Mul)]
     [InlineData(Operator.Div)]
     [InlineData(Operator.Pow)]
+    [InlineData(Operator.Mod)]
     public void Parse_OtherOperatorsAreNotUnary(Operator op)
     {
         // +5, *5, /5, ^5

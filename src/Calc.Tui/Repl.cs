@@ -9,7 +9,7 @@ internal static class Repl
     private const string ResultFormat = "G12";
 
     private const string HelpText = @"Type an expression and press Enter, for example (2+3)*4.
-Operators: + - * / ^ and parentheses ( ).
+Operators: + - * / % ^ and parentheses ( ).
 Commands: help (show this help), exit or quit (leave).";
 
     public static void Run(TextReader input, TextWriter output)

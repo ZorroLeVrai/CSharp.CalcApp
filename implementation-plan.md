@@ -234,6 +234,8 @@ Each item follows the same two steps: tokenizer tests then code, parser tests th
 2. **Implementation**
    - Add `Operator.Mod`, tokenizer support, precedence entry and evaluation (C#'s `%` operator on `double`).
    - Add `%` to the operator list in the REPL's `help` text (and to its test).
+   - `%` is the remainder, not a mathematical modulo: the result takes the sign of the left operand (`-7%3` is `-1`, `7%-3` is `1`), and decimals work (`5.5%2` is `1.5`). A zero divisor is checked explicitly (`double % 0` is `NaN` in .NET): `5%0` is `DivisionByZero`. `infinity % 3` is `NaN`, which becomes a `DomainError`.
+   - `%` sits on the `* /` level, left-associative (`10%4%3` is `(10%4)%3`, `2*7%4` is `(2*7)%4`); `^` binds tighter and `+ -` looser.
 
 ### Stage 13: Constants
 
@@ -279,6 +281,6 @@ The tree design allows evaluating one parsed expression many times with differen
 - [x] Stage 9: REPL loop
 - [x] Stage 10: Manual check
 - [x] Stage 11: Unary minus
-- [ ] Stage 12: Modulo
+- [x] Stage 12: Modulo
 - [ ] Stage 13: Constants
 - [ ] Stage 14: Functions

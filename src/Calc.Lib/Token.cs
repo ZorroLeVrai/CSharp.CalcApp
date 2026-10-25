@@ -8,6 +8,7 @@ public enum Operator
     Mul,
     Div,
     Pow,
+    Mod,
 }
 
 internal abstract record Token;

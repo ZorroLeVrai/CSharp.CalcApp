@@ -20,6 +20,7 @@ public class TokenizerTests
     [InlineData("*", Operator.Mul)]
     [InlineData("/", Operator.Div)]
     [InlineData("^", Operator.Pow)]
+    [InlineData("%", Operator.Mod)]
     public void Tokenize_RecognisesEachOperator(string input, Operator expected)
     {
         var tokens = Tokenizer.Tokenize(input);
@@ -103,6 +104,26 @@ public class TokenizerTests
         var ex = Assert.Throws<CalcException>(() => Tokenizer.Tokenize("1.2.3"));
 
         Assert.Contains("1.2.3", ex.Message);
+    }
+
+    [Fact]
+    public void Tokenize_Modulo()
+    {
+        var tokens = Tokenizer.Tokenize("7 % 3");
+
+        Assert.Equal(
+            new Token[] { new NumberToken(7), new OperatorToken(Operator.Mod), new NumberToken(3) },
+            tokens);
+    }
+
+    [Fact]
+    public void Tokenize_ModuloWithoutSpaces_AndDecimals()
+    {
+        var tokens = Tokenizer.Tokenize("5.5%2");
+
+        Assert.Equal(
+            new Token[] { new NumberToken(5.5), new OperatorToken(Operator.Mod), new NumberToken(2) },
+            tokens);
     }
 
     [Fact]

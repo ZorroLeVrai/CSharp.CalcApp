@@ -136,7 +136,7 @@ internal sealed class Parser
     private static int Precedence(Operator op) => op switch
     {
         Operator.Add or Operator.Sub => 1,
-        Operator.Mul or Operator.Div => 2,
+        Operator.Mul or Operator.Div or Operator.Mod => 2,
         Operator.Pow => 3,
         _ => throw new ArgumentOutOfRangeException(nameof(op), op, "Unknown operator"),
     };

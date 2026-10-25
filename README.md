@@ -55,4 +55,4 @@ dotnet format               # format
 
 ## Status
 
-Not yet implemented. Only the planning documents exist so far; the code will follow.
+Scaffolded, not yet implemented. The solution and its four projects exist and build, but there is no calculator code yet; it will follow stage by stage.

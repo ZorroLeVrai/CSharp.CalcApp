@@ -2,7 +2,9 @@
 
 ## Project overview
 
-> **Status: not yet implemented.** Only the planning documents (this file and `tech-stack.md`) exist. The solution, projects, and code described below are the intended design and still need to be created.
+> **Status: scaffolded, not yet implemented.** The solution and the four projects exist and build, but contain no calculator code or tests yet. Features are added stage by stage following [implementation-plan.md](implementation-plan.md). The files named below that do not exist yet (e.g. `Calculator.cs`) are the intended design.
+>
+> Shared build settings (net10.0, C# 14, nullable, warnings as errors) are in `Directory.Build.props`. `nuget.config` pins nuget.org as the package source. Test projects see internals through `InternalsVisibleTo`.
 
 A C# (.NET 10) application that performs calculations. It takes a text expression such as `"2+3"` and returns the result (`5`).
 
@@ -15,7 +17,7 @@ The solution contains four projects:
 
 ## Layout
 
-Planned layout (not yet created):
+Layout (projects exist; source files such as `Calculator.cs` are still to be written; also present: `Directory.Build.props`, `nuget.config`, `.gitignore`):
 
 ```
 CSharp.calc/

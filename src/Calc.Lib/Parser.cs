@@ -17,7 +17,10 @@ internal sealed class Parser
 
         if (parser._position < tokens.Count)
         {
-            throw new CalcException(CalcErrorKind.UnexpectedToken);
+            // Everything that can continue an expression was consumed, so a leftover ")" has no match.
+            throw tokens[parser._position] is RightParenToken
+                ? new CalcException(CalcErrorKind.UnbalancedParentheses)
+                : new CalcException(CalcErrorKind.UnexpectedToken);
         }
 
         return expr;
@@ -52,13 +55,36 @@ internal sealed class Parser
             throw new CalcException(CalcErrorKind.UnexpectedEnd);
         }
 
-        if (_tokens[_position] is NumberToken number)
+        switch (_tokens[_position])
         {
-            _position++;
-            return new NumberExpr(number.Value);
+            case NumberToken number:
+                _position++;
+                return new NumberExpr(number.Value);
+
+            case LeftParenToken:
+                _position++;
+                var inner = ParseExpression(0);
+                ExpectRightParen();
+                return inner;
+
+            default:
+                throw new CalcException(CalcErrorKind.UnexpectedToken);
+        }
+    }
+
+    private void ExpectRightParen()
+    {
+        if (_position >= _tokens.Count)
+        {
+            throw new CalcException(CalcErrorKind.UnbalancedParentheses);
         }
 
-        throw new CalcException(CalcErrorKind.UnexpectedToken);
+        if (_tokens[_position] is not RightParenToken)
+        {
+            throw new CalcException(CalcErrorKind.UnexpectedToken);
+        }
+
+        _position++;
     }
 
     private static int Precedence(Operator op) => op switch

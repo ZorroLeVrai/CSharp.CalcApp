@@ -265,7 +265,7 @@ The tree design allows evaluating one parsed expression many times with differen
 - [x] Stage 3: Tokenizer, parentheses
 - [x] Stage 4: Parser, single operations
 - [x] Stage 5: Parser, precedence and associativity
-- [ ] Stage 6: Parser, parentheses
+- [x] Stage 6: Parser, parentheses
 - [ ] Stage 7: Evaluator
 - [ ] Stage 8: Public API and end-to-end tests
 - [ ] Stage 9: REPL loop

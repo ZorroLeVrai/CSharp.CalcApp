@@ -86,6 +86,59 @@ public class CalculatorTests
         Assert.Equal(CalcErrorKind.DomainError, ex.Kind);
     }
 
+    [Theory]
+    [InlineData("pi", Math.PI)]
+    [InlineData("e", Math.E)]
+    [InlineData("2*pi", 2 * Math.PI)]
+    [InlineData("-pi", -Math.PI)]
+    [InlineData("pi/2", Math.PI / 2)]
+    [InlineData("(pi+e)/2", (Math.PI + Math.E) / 2)]
+    [InlineData("e^2", Math.E * Math.E)]
+    [InlineData("  pi  ", Math.PI)]
+    [InlineData("pi-pi", 0)]
+    public void Evaluate_Constants(string input, double expected)
+    {
+        Assert.Equal(expected, Calculator.Evaluate(input), Precision);
+    }
+
+    [Fact]
+    public void Evaluate_PiIsApproximately3Point14159()
+    {
+        Assert.Equal(3.14159, Calculator.Evaluate("pi"), 5);
+    }
+
+    [Theory]
+    [InlineData("x", "x")]
+    [InlineData("PI", "PI")]
+    [InlineData("Pi", "Pi")]
+    [InlineData("E", "E")]
+    [InlineData("pie", "pie")]
+    [InlineData("1+foo", "foo")]
+    [InlineData("2*(3+bar)", "bar")]
+    [InlineData("1/0+foo", "foo")]
+    public void Evaluate_UnknownNameIsReportedWithItsName(string input, string name)
+    {
+        var ex = Assert.Throws<CalcException>(() => Calculator.Evaluate(input));
+
+        Assert.Equal(CalcErrorKind.UnknownIdentifier, ex.Kind);
+        Assert.Contains($"'{name}'", ex.Message);
+    }
+
+    [Theory]
+    [InlineData("2pi", CalcErrorKind.UnexpectedToken)]
+    [InlineData("pi pi", CalcErrorKind.UnexpectedToken)]
+    [InlineData("pi e", CalcErrorKind.UnexpectedToken)]
+    [InlineData("1e5", CalcErrorKind.UnexpectedToken)]
+    [InlineData("pi+", CalcErrorKind.UnexpectedEnd)]
+    [InlineData("pi(2)", CalcErrorKind.UnexpectedToken)]
+    [InlineData("pi$", CalcErrorKind.UnexpectedCharacter)]
+    public void Evaluate_ConstantErrors(string input, CalcErrorKind expected)
+    {
+        var ex = Assert.Throws<CalcException>(() => Calculator.Evaluate(input));
+
+        Assert.Equal(expected, ex.Kind);
+    }
+
     [Fact]
     public void Evaluate_NegativeBaseWrittenWithUnaryMinus_IsReal()
     {

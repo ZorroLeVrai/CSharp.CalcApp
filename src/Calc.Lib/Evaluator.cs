@@ -5,6 +5,7 @@ internal static class Evaluator
     public static double Evaluate(Expr expr) => expr switch
     {
         NumberExpr number => number.Value,
+        ConstantExpr constant => constant.Value,
         UnaryExpr unary => Apply(unary.Op, Evaluate(unary.Operand)),
         BinaryExpr binary => Apply(binary.Op, Evaluate(binary.Left), Evaluate(binary.Right)),
         _ => throw new InvalidOperationException($"Unknown expression type {expr.GetType().Name}"),

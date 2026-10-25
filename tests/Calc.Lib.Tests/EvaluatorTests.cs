@@ -531,6 +531,90 @@ public class EvaluatorTests
     }
 
     [Fact]
+    public void Evaluate_ConstantNode_ReturnsItsValue()
+    {
+        Assert.Equal(Math.PI, Evaluator.Evaluate(new ConstantExpr("pi", Math.PI)));
+    }
+
+    [Theory]
+    [InlineData("pi", Math.PI)]
+    [InlineData("e", Math.E)]
+    [InlineData("2*pi", 2 * Math.PI)]
+    [InlineData("pi/2", Math.PI / 2)]
+    [InlineData("pi^2", Math.PI * Math.PI)]
+    [InlineData("e^2", Math.E * Math.E)]
+    [InlineData("-pi", -Math.PI)]
+    [InlineData("pi+e", Math.PI + Math.E)]
+    [InlineData("pi-pi", 0)]
+    [InlineData("e*e*e", Math.E * Math.E * Math.E)]
+    [InlineData("(pi+e)/2", (Math.PI + Math.E) / 2)]
+    [InlineData("1+pi*2", 1 + (Math.PI * 2))]
+    [InlineData("pi%2", Math.PI % 2)]
+    public void Evaluate_ConstantsFromSource(string input, double expected)
+    {
+        Assert.Equal(expected, EvalSource(input), Precision);
+    }
+
+    [Fact]
+    public void Evaluate_ConstantValuesAreAccurate()
+    {
+        Assert.Equal(3.14159, EvalSource("pi"), 5);
+        Assert.Equal(2.71828, EvalSource("e"), 5);
+    }
+
+    [Theory]
+    [InlineData("e^1", Math.E)]
+    [InlineData("e^0", 1)]
+    [InlineData("e^-1", 1 / Math.E)]
+    public void Evaluate_PowersOfE(string input, double expected)
+    {
+        Assert.Equal(expected, EvalSource(input), Precision);
+    }
+
+    [Theory]
+    [InlineData("x")]
+    [InlineData("PI")]
+    [InlineData("E")]
+    [InlineData("pie")]
+    [InlineData("pi2")]
+    [InlineData("1+foo")]
+    [InlineData("foo/0")]
+    [InlineData("1/0+foo")]
+    [InlineData("2*(3+bar)")]
+    public void Evaluate_UnknownNames_AreReportedBeforeAnythingIsEvaluated(string input)
+    {
+        var ex = Assert.Throws<CalcException>(() => EvalSource(input));
+
+        Assert.Equal(CalcErrorKind.UnknownIdentifier, ex.Kind);
+    }
+
+    [Theory]
+    [InlineData("2pi")]
+    [InlineData("pi pi")]
+    [InlineData("pi e")]
+    [InlineData("1e5")]
+    [InlineData("pi(2)")]
+    [InlineData("2 pi")]
+    [InlineData("(1)pi")]
+    public void Evaluate_ImplicitMultiplicationIsNotSupported(string input)
+    {
+        var ex = Assert.Throws<CalcException>(() => EvalSource(input));
+
+        Assert.Equal(CalcErrorKind.UnexpectedToken, ex.Kind);
+    }
+
+    [Theory]
+    [InlineData("(-8)^pi", CalcErrorKind.DomainError)]
+    [InlineData("1/(pi-pi)", CalcErrorKind.DivisionByZero)]
+    [InlineData("pi%(e-e)", CalcErrorKind.DivisionByZero)]
+    public void Evaluate_ErrorsWithConstants(string input, CalcErrorKind expected)
+    {
+        var ex = Assert.Throws<CalcException>(() => EvalSource(input));
+
+        Assert.Equal(expected, ex.Kind);
+    }
+
+    [Fact]
     public void Evaluate_ParsedExpressions_EndToEndThroughTheEarlierPhases()
     {
         Assert.Equal(20, EvalSource("(2+3)*4"));

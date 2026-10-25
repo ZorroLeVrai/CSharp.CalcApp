@@ -77,7 +77,10 @@ public class TokenizerTests
 
     [Theory]
     [InlineData("2 $ 3", '$')]
-    [InlineData("a", 'a')]
+    [InlineData("@", '@')]
+    [InlineData("_", '_')]
+    [InlineData("é", 'é')]
+    [InlineData("pi$", '$')]
     [InlineData("2 # 3", '#')]
     public void Tokenize_InvalidCharacter_Throws(string input, char bad)
     {
@@ -104,6 +107,94 @@ public class TokenizerTests
         var ex = Assert.Throws<CalcException>(() => Tokenizer.Tokenize("1.2.3"));
 
         Assert.Contains("1.2.3", ex.Message);
+    }
+
+    [Theory]
+    [InlineData("pi")]
+    [InlineData("e")]
+    [InlineData("sqrt")]
+    [InlineData("PI")]
+    [InlineData("Pi")]
+    [InlineData("x1")]
+    [InlineData("abc123")]
+    [InlineData("e5")]
+    public void Tokenize_ReadsAnIdentifier(string name)
+    {
+        var tokens = Tokenizer.Tokenize(name);
+
+        Assert.Equal(new Token[] { new IdentifierToken(name) }, tokens);
+    }
+
+    [Fact]
+    public void Tokenize_IdentifierInsideAnExpression()
+    {
+        var tokens = Tokenizer.Tokenize("2*pi");
+
+        Assert.Equal(
+            new Token[] { new NumberToken(2), new OperatorToken(Operator.Mul), new IdentifierToken("pi") },
+            tokens);
+    }
+
+    [Fact]
+    public void Tokenize_TwoConstants()
+    {
+        var tokens = Tokenizer.Tokenize("pi+e");
+
+        Assert.Equal(
+            new Token[] { new IdentifierToken("pi"), new OperatorToken(Operator.Add), new IdentifierToken("e") },
+            tokens);
+    }
+
+    [Fact]
+    public void Tokenize_WhitespaceSeparatesIdentifiers()
+    {
+        var tokens = Tokenizer.Tokenize("p i");
+
+        Assert.Equal(new Token[] { new IdentifierToken("p"), new IdentifierToken("i") }, tokens);
+    }
+
+    [Fact]
+    public void Tokenize_NumberFollowedByLetters_GivesANumberThenAnIdentifier()
+    {
+        // 2pi and 1e5: no implicit multiplication and no scientific notation, the parser reports them
+        Assert.Equal(
+            new Token[] { new NumberToken(2), new IdentifierToken("pi") },
+            Tokenizer.Tokenize("2pi"));
+        Assert.Equal(
+            new Token[] { new NumberToken(1), new IdentifierToken("e5") },
+            Tokenizer.Tokenize("1e5"));
+    }
+
+    [Fact]
+    public void Tokenize_IdentifierFollowedByAParenthesis()
+    {
+        var tokens = Tokenizer.Tokenize("sqrt(4)");
+
+        Assert.Equal(
+            new Token[]
+            {
+                new IdentifierToken("sqrt"), new LeftParenToken(), new NumberToken(4), new RightParenToken(),
+            },
+            tokens);
+    }
+
+    [Fact]
+    public void Tokenize_IdentifierStopsAtAnOperator()
+    {
+        var tokens = Tokenizer.Tokenize("pi^e");
+
+        Assert.Equal(
+            new Token[] { new IdentifierToken("pi"), new OperatorToken(Operator.Pow), new IdentifierToken("e") },
+            tokens);
+    }
+
+    [Fact]
+    public void Tokenize_IdentifiersAreAsciiOnly()
+    {
+        var ex = Assert.Throws<CalcException>(() => Tokenizer.Tokenize("pié"));
+
+        Assert.Equal(CalcErrorKind.UnexpectedCharacter, ex.Kind);
+        Assert.Contains("'é'", ex.Message);
     }
 
     [Fact]

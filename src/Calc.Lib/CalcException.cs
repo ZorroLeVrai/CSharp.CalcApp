@@ -11,6 +11,7 @@ public enum CalcErrorKind
     DivisionByZero,
     DomainError,
     ExpressionTooDeep,
+    UnknownIdentifier,
 }
 
 /// <summary>The only exception <c>Calc.Lib</c> throws for invalid user input.</summary>
@@ -34,6 +35,7 @@ public sealed class CalcException : Exception
         CalcErrorKind.DivisionByZero => "Division by zero",
         CalcErrorKind.DomainError => "Result is not a real number",
         CalcErrorKind.ExpressionTooDeep => "Expression is nested too deeply",
+        CalcErrorKind.UnknownIdentifier => $"Unknown name '{detail}'",
         _ => "Calculation error",
     };
 }

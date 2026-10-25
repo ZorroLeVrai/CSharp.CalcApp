@@ -27,6 +27,16 @@ internal static class Tokenizer
 
                 tokens.Add(new NumberToken(ParseNumber(input[start..charIndex])));
             }
+            else if (char.IsAsciiLetter(c))
+            {
+                var start = charIndex;
+                while (charIndex < input.Length && char.IsAsciiLetterOrDigit(input[charIndex]))
+                {
+                    charIndex++;
+                }
+
+                tokens.Add(new IdentifierToken(input[start..charIndex]));
+            }
             else if (c == '(')
             {
                 tokens.Add(new LeftParenToken());

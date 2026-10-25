@@ -75,6 +75,12 @@ internal sealed class Parser
                 _position++;
                 return (new NumberExpr(number.Value), 0);
 
+            case IdentifierToken identifier:
+                _position++;
+                return Constants.TryGet(identifier.Name, out var value)
+                    ? (new ConstantExpr(identifier.Name, value), 0)
+                    : throw new CalcException(CalcErrorKind.UnknownIdentifier, identifier.Name);
+
             case LeftParenToken:
                 _position++;
                 EnterNesting();

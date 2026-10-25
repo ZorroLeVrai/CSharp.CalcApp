@@ -197,6 +197,167 @@ public class ParserTests
         Assert.Equal(expected, expr);
     }
 
+    private static IdentifierToken Id(string name) => new(name);
+
+    private static ConstantExpr Pi => new("pi", Math.PI);
+
+    private static ConstantExpr E => new("e", Math.E);
+
+    [Fact]
+    public void Parse_ConstantPi()
+    {
+        Assert.Equal(Pi, Parser.Parse([Id("pi")]));
+    }
+
+    [Fact]
+    public void Parse_ConstantE()
+    {
+        Assert.Equal(E, Parser.Parse([Id("e")]));
+    }
+
+    [Fact]
+    public void Parse_ConstantsHaveExactValues()
+    {
+        Assert.Equal(Math.PI, Assert.IsType<ConstantExpr>(Parser.Parse([Id("pi")])).Value);
+        Assert.Equal(Math.E, Assert.IsType<ConstantExpr>(Parser.Parse([Id("e")])).Value);
+    }
+
+    [Fact]
+    public void Parse_ConstantAsAnOperand()
+    {
+        // 2*pi
+        var expr = Parser.Parse([Num(2), Op(Operator.Mul), Id("pi")]);
+
+        Assert.Equal(B(Operator.Mul, N(2), Pi), expr);
+    }
+
+    [Fact]
+    public void Parse_ConstantsOnBothSides()
+    {
+        // pi+e
+        var expr = Parser.Parse([Id("pi"), Op(Operator.Add), Id("e")]);
+
+        Assert.Equal(B(Operator.Add, Pi, E), expr);
+    }
+
+    [Fact]
+    public void Parse_ConstantsFollowOperatorPrecedence()
+    {
+        // 1+pi*e^2
+        var expr = Parser.Parse(
+            [Num(1), Op(Operator.Add), Id("pi"), Op(Operator.Mul), Id("e"), Op(Operator.Pow), Num(2)]);
+
+        Assert.Equal(B(Operator.Add, N(1), B(Operator.Mul, Pi, B(Operator.Pow, E, N(2)))), expr);
+    }
+
+    [Fact]
+    public void Parse_NegatedConstant()
+    {
+        // -pi
+        var expr = Parser.Parse([Op(Operator.Sub), Id("pi")]);
+
+        Assert.Equal(Neg(Pi), expr);
+    }
+
+    [Fact]
+    public void Parse_ConstantInTheExponent()
+    {
+        // 2^pi
+        var expr = Parser.Parse([Num(2), Op(Operator.Pow), Id("pi")]);
+
+        Assert.Equal(B(Operator.Pow, N(2), Pi), expr);
+    }
+
+    [Fact]
+    public void Parse_ParenthesisedConstant()
+    {
+        var expr = Parser.Parse([LParen(), Id("pi"), RParen()]);
+
+        Assert.Equal(Pi, expr);
+    }
+
+    [Theory]
+    [InlineData("x")]
+    [InlineData("foo")]
+    [InlineData("PI")]
+    [InlineData("Pi")]
+    [InlineData("E")]
+    [InlineData("pie")]
+    [InlineData("pi2")]
+    [InlineData("e5")]
+    public void Parse_UnknownName_Throws(string name)
+    {
+        var ex = Assert.Throws<CalcException>(() => Parser.Parse([Id(name)]));
+
+        Assert.Equal(CalcErrorKind.UnknownIdentifier, ex.Kind);
+        Assert.Contains($"'{name}'", ex.Message);
+    }
+
+    [Fact]
+    public void Parse_UnknownNameInsideAnExpression_Throws()
+    {
+        // 1+(2*foo)
+        var ex = Assert.Throws<CalcException>(
+            () => Parser.Parse([Num(1), Op(Operator.Add), LParen(), Num(2), Op(Operator.Mul), Id("foo"), RParen()]));
+
+        Assert.Equal(CalcErrorKind.UnknownIdentifier, ex.Kind);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Parse_ConstantNextToANumber_Throws(bool numberFirst)
+    {
+        // 2pi and pi2 as tokens: implicit multiplication is not supported
+        Token[] tokens = numberFirst ? [Num(2), Id("pi")] : [Id("pi"), Num(2)];
+
+        var ex = Assert.Throws<CalcException>(() => Parser.Parse(tokens));
+
+        Assert.Equal(CalcErrorKind.UnexpectedToken, ex.Kind);
+    }
+
+    [Fact]
+    public void Parse_TwoConstantsInARow_Throws()
+    {
+        // pi e
+        var ex = Assert.Throws<CalcException>(() => Parser.Parse([Id("pi"), Id("e")]));
+
+        Assert.Equal(CalcErrorKind.UnexpectedToken, ex.Kind);
+    }
+
+    [Fact]
+    public void Parse_ConstantBeforeAnOpeningParenthesis_Throws()
+    {
+        // pi(2)
+        var ex = Assert.Throws<CalcException>(() => Parser.Parse([Id("pi"), LParen(), Num(2), RParen()]));
+
+        Assert.Equal(CalcErrorKind.UnexpectedToken, ex.Kind);
+    }
+
+    [Fact]
+    public void Parse_DanglingOperatorAfterAConstant_Throws()
+    {
+        // pi+
+        var ex = Assert.Throws<CalcException>(() => Parser.Parse([Id("pi"), Op(Operator.Add)]));
+
+        Assert.Equal(CalcErrorKind.UnexpectedEnd, ex.Kind);
+    }
+
+    [Fact]
+    public void Parse_LongChainOfConstants_Works()
+    {
+        var tokens = new List<Token> { Id("pi") };
+        for (var i = 0; i < 1024; i++)
+        {
+            tokens.Add(Op(Operator.Add));
+            tokens.Add(Id("e"));
+        }
+
+        var expr = Parser.Parse(tokens);
+
+        Assert.Equal(1025, CountNumbers(expr));
+    }
+
     [Fact]
     public void Parse_ModuloBindsTighterThanAddition_OnTheRight()
     {
@@ -1025,7 +1186,7 @@ public class ParserTests
         {
             switch (pending.Pop())
             {
-                case NumberExpr:
+                case NumberExpr or ConstantExpr:
                     count++;
                     break;
                 case BinaryExpr binary:

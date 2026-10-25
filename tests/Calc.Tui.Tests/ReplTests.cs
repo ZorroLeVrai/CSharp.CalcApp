@@ -147,6 +147,15 @@ public class ReplTests
     }
 
     [Fact]
+    public void Run_HelpListsTheConstants()
+    {
+        var help = HelpOutput();
+
+        Assert.Contains("pi", help);
+        Assert.Contains("Constants", help);
+    }
+
+    [Fact]
     public void Run_HelpIsShort()
     {
         var lines = HelpOutput().Split('\n', StringSplitOptions.RemoveEmptyEntries);
@@ -280,6 +289,40 @@ public class ReplTests
         var lines = output.Split('\n');
         Assert.Equal("> Error: Division by zero", lines[0]);
         Assert.Equal("> 1", lines[1]);
+    }
+
+    [Theory]
+    [InlineData("pi", "3.14159265359")]
+    [InlineData("e", "2.71828182846")]
+    [InlineData("2*pi", "6.28318530718")]
+    [InlineData("pi-pi", "0")]
+    [InlineData("-e", "-2.71828182846")]
+    public void Run_Constants(string line, string expected)
+    {
+        Assert.Equal($"> {expected}\n> ", Run(line + "\nquit\n"));
+    }
+
+    [Fact]
+    public void Run_UnknownNamePrintsAnErrorWithTheNameAndTheLoopContinues()
+    {
+        var output = Run("foo+1\n1+1\nquit\n");
+
+        var lines = output.Split('\n');
+        Assert.Equal("> Error: Unknown name 'foo'", lines[0]);
+        Assert.Equal("> 2", lines[1]);
+    }
+
+    [Fact]
+    public void Run_NamesAreCaseSensitive()
+    {
+        Assert.Contains("Unknown name 'PI'", Run("PI\nquit\n"));
+    }
+
+    [Fact]
+    public void Run_ExitAndHelpAreCommandsNotNames()
+    {
+        // "exit" alone leaves the loop, but inside an expression it is just an unknown name
+        Assert.Contains("Unknown name 'exit'", Run("1+exit\nquit\n"));
     }
 
     [Fact]

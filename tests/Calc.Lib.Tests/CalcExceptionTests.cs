@@ -11,6 +11,7 @@ public class CalcExceptionTests
     [InlineData(CalcErrorKind.DivisionByZero)]
     [InlineData(CalcErrorKind.DomainError)]
     [InlineData(CalcErrorKind.ExpressionTooDeep)]
+    [InlineData(CalcErrorKind.UnknownIdentifier)]
     public void Kind_IsExposed(CalcErrorKind kind)
     {
         var ex = new CalcException(kind);
@@ -27,6 +28,7 @@ public class CalcExceptionTests
     [InlineData(CalcErrorKind.DivisionByZero)]
     [InlineData(CalcErrorKind.DomainError)]
     [InlineData(CalcErrorKind.ExpressionTooDeep)]
+    [InlineData(CalcErrorKind.UnknownIdentifier)]
     public void Message_IsReadableForEveryKind(CalcErrorKind kind)
     {
         var ex = new CalcException(kind);
@@ -49,6 +51,14 @@ public class CalcExceptionTests
         var ex = new CalcException(CalcErrorKind.InvalidNumber, "1.2.3");
 
         Assert.Contains("1.2.3", ex.Message);
+    }
+
+    [Fact]
+    public void Message_IncludesTheUnknownName()
+    {
+        var ex = new CalcException(CalcErrorKind.UnknownIdentifier, "foo");
+
+        Assert.Contains("'foo'", ex.Message);
     }
 
     [Fact]

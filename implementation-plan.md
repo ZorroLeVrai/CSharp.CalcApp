@@ -244,6 +244,10 @@ Each item follows the same two steps: tokenizer tests then code, parser tests th
    - Evaluate `pi` approximately 3.14159, `2*pi`; unknown name -> `UnknownIdentifier`
 2. **Implementation**
    - Add `IdentifierToken`, `ConstantExpr` (or a name lookup using `Math.PI` and `Math.E`) and the error kind.
+   - An identifier is an ASCII letter followed by ASCII letters or digits (`pi`, `x1`); anything else (`_`, `é`) is still an `UnexpectedCharacter`. The tokenizer does not judge names: `PI` is a valid identifier token.
+   - Names are resolved by the parser through a `Constants` table (`pi`, `e`; lowercase and case-sensitive) into `ConstantExpr(Name, Value)`. An unknown name throws `CalcErrorKind.UnknownIdentifier` (message `Unknown name 'foo'`) while parsing, so it is reported before anything is evaluated: `1/0+foo` is an unknown name, not a division by zero.
+   - No implicit multiplication and no scientific notation: `2pi`, `pi pi` and `1e5` (tokens `1`, `e5`) are `UnexpectedToken`.
+   - Add the constants to the REPL's `help` text (and to its test).
 
 ### Stage 14: Functions
 
@@ -282,5 +286,5 @@ The tree design allows evaluating one parsed expression many times with differen
 - [x] Stage 10: Manual check
 - [x] Stage 11: Unary minus
 - [x] Stage 12: Modulo
-- [ ] Stage 13: Constants
+- [x] Stage 13: Constants
 - [ ] Stage 14: Functions

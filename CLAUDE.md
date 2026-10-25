@@ -60,6 +60,7 @@ Example: `Calculator.Evaluate("2+3")` returns `5.0`.
 - A simple REPL over plain stdin/stdout (no full-screen TUI framework).
 - Loop: print a prompt, read a line, call `Calculator.Evaluate`, print the result or the error message.
 - `exit` / `quit` (or EOF / Ctrl+Z on Windows, Ctrl+D elsewhere) leaves the loop. Empty lines are ignored.
+- `help` prints a short help text listing the operators and the commands. Keep it in sync when operators or commands are added.
 - Errors are shown to the user without crashing the program.
 - All calculation logic lives in `Calc.Lib`; `Calc.Tui` only handles input and output.
 

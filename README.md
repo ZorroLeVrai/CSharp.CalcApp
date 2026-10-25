@@ -20,7 +20,7 @@ The solution will contain four projects:
 - Parentheses, decimal numbers and whitespace
 - Typed errors (`CalcException`) instead of unhandled exceptions (invalid input, unbalanced parentheses, division by zero, results that are not real numbers such as `sqrt(-1)` or `ln(0)`, unknown names or functions, expressions nested too deeply)
 - Results rounded to 12 significant digits; overflow prints `inf`
-- Simple REPL: type an expression, press Enter; `exit` or `quit` leaves
+- Simple REPL: type an expression, press Enter; `help` shows a short help text; `exit` or `quit` leaves
 
 Not planned: implicit multiplication (`2pi`), scientific notation (`1e5`), variables, functions with several arguments.
 

@@ -21,6 +21,7 @@ Build a C# application on .NET 10 that evaluates text arithmetic expressions. Gi
 
 - Plain stdin/stdout REPL console app: prompt, read a line, print the result or error
 - `exit` / `quit` / EOF (Ctrl+Z on Windows, Ctrl+D elsewhere) to leave; empty lines ignored
+- `help` command that prints a short help text (the operators and the `help`, `exit` and `quit` commands)
 - Errors displayed without crashing
 
 ## Out of scope

@@ -194,10 +194,12 @@ static void Run(TextReader input, TextWriter output)
    - Empty or whitespace-only lines are ignored
    - `exit` and `quit` stop the loop; end of input (`ReadLine()` returns `null`) also stops it
    - The prompt (`> `) is written before each read
+   - `help` (any case, surrounding whitespace ignored) prints a short help text that lists the operators and the `help`, `exit` and `quit` commands, then the loop continues
 2. **Implementation**
    - Implement `Run` in `src/Calc.Tui/Repl.cs` and call it from `Program.cs`.
-   - Catch `CalcException` inside the loop and print its message.
-   - Format results simply with the invariant culture; whole numbers display without a trailing `.0` (`5`, not `5.0`).
+   - Catch `CalcException` inside the loop and print `Error: <message>`. Other exceptions are not caught: they would be bugs and should surface.
+   - Output format: `> ` before every read; one line per result or error; empty and whitespace-only lines print nothing; `exit` / `quit` (any case, surrounding whitespace ignored) return without extra output; end of input prints a final newline so the shell prompt starts on a fresh line.
+   - Format results with the invariant culture and 12 significant digits (`"G12"`): whole numbers display without a trailing `.0` (`5`, not `5.0`), `0.1+0.2` prints `0.3`, overflow prints `inf` / `-inf`, and `-0` prints `0`.
    - Replace the project template's "Hello, World!" placeholder.
 
 ### Stage 10: Manual check
@@ -228,6 +230,7 @@ Each item follows the same two steps: tokenizer tests then code, parser tests th
    - `7%3` -> `1`; same precedence as `*` and `/`; `5%0` -> `DivisionByZero`
 2. **Implementation**
    - Add `Operator.Mod`, tokenizer support, precedence entry and evaluation (C#'s `%` operator on `double`).
+   - Add `%` to the operator list in the REPL's `help` text (and to its test).
 
 ### Stage 13: Constants
 
@@ -270,7 +273,7 @@ The tree design allows evaluating one parsed expression many times with differen
 - [x] Stage 6: Parser, parentheses
 - [x] Stage 7: Evaluator
 - [x] Stage 8: Public API and end-to-end tests
-- [ ] Stage 9: REPL loop
+- [x] Stage 9: REPL loop
 - [ ] Stage 10: Manual check
 - [ ] Stage 11: Unary minus
 - [ ] Stage 12: Modulo

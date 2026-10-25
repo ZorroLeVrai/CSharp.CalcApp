@@ -6,11 +6,12 @@
 
 A C# (.NET 10) application that performs calculations. It takes a text expression such as `"2+3"` and returns the result (`5`).
 
-The solution contains three projects:
+The solution contains four projects:
 
 1. **Calc.Lib** (class library): the calculation engine. Parses and evaluates expressions.
 2. **Calc.Tui** (console app): the text interface. References `Calc.Lib`.
 3. **Calc.Lib.Tests** (xUnit test project): unit tests for `Calc.Lib`.
+4. **Calc.Tui.Tests** (xUnit test project): unit tests for the `Calc.Tui` REPL loop.
 
 ## Layout
 
@@ -29,8 +30,10 @@ CSharp.calc/
 │       ├── Calc.Tui.csproj
 │       └── Program.cs
 └── tests/
-    └── Calc.Lib.Tests/      # xUnit tests for Calc.Lib
-        └── Calc.Lib.Tests.csproj
+    ├── Calc.Lib.Tests/      # xUnit tests for Calc.Lib
+    │   └── Calc.Lib.Tests.csproj
+    └── Calc.Tui.Tests/      # xUnit tests for the Calc.Tui REPL
+        └── Calc.Tui.Tests.csproj
 ```
 
 ## Calc.Lib
@@ -65,13 +68,20 @@ dotnet build                                # build the whole solution
 dotnet run --project src/Calc.Tui           # run the REPL
 dotnet test                                 # run all tests
 dotnet test tests/Calc.Lib.Tests            # run library tests only
+dotnet test tests/Calc.Tui.Tests            # run REPL tests only
 dotnet format                               # format
 dotnet format --verify-no-changes           # check formatting
 ```
 
+## Workflow
+
+- **TDD:** we always write the tests first, before the implementation. Confirm the new tests fail (red), then write the minimum code to make them pass (green), then refactor. See [implementation-plan.md](implementation-plan.md).
+- **Documentation:** when the app documentation has to be updated, update all four files together so they stay consistent: `implementation-plan.md`, `project-scope.md`, `tech-stack.md` and `README.md`.
+- **Git:** commits are made manually by the user. Do not run `git commit` or `git push` unless explicitly asked.
+
 ## Conventions
 
 - Target `net10.0`, C# 14; enable nullable reference types and treat warnings as errors. Code must pass `dotnet format` and build without warnings.
-- Unit tests use xUnit and live in `tests/Calc.Lib.Tests`; cover precedence, associativity, unary minus, functions, and every error case. Prefer `[Theory]` with `[InlineData]` for table-style cases.
+- Unit tests use xUnit. Library tests live in `tests/Calc.Lib.Tests` and REPL tests in `tests/Calc.Tui.Tests`; cover precedence, associativity, unary minus, functions, and every error case. Prefer `[Theory]` with `[InlineData]` for table-style cases.
 - Prefer no external dependencies for `Calc.Lib`. Add NuGet packages only when clearly justified.
 - Use `CalcException` for expected failures on user input; avoid catching general `Exception` except at the REPL boundary.

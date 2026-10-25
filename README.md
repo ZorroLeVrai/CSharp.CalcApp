@@ -4,11 +4,12 @@ A C# (.NET 10) application that evaluates text arithmetic expressions. Given `2+
 
 > **Status: not yet implemented.** None of the features below are available yet. They are planned and will be implemented soon.
 
-The solution will contain three projects:
+The solution will contain four projects:
 
 - **Calc.Lib**: the calculation library (parsing and evaluation, no I/O)
 - **Calc.Tui**: a plain stdin/stdout REPL built on `Calc.Lib`
 - **Calc.Lib.Tests**: xUnit tests for `Calc.Lib`
+- **Calc.Tui.Tests**: xUnit tests for the `Calc.Tui` REPL
 
 ## Planned features
 

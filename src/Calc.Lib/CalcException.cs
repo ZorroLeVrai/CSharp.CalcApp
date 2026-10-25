@@ -9,6 +9,7 @@ public enum CalcErrorKind
     UnexpectedEnd,
     UnbalancedParentheses,
     DivisionByZero,
+    DomainError,
 }
 
 /// <summary>The only exception <c>Calc.Lib</c> throws for invalid user input.</summary>
@@ -30,6 +31,7 @@ public sealed class CalcException : Exception
         CalcErrorKind.UnexpectedEnd => "Unexpected end of expression",
         CalcErrorKind.UnbalancedParentheses => "Unbalanced parentheses",
         CalcErrorKind.DivisionByZero => "Division by zero",
+        CalcErrorKind.DomainError => "Result is not a real number",
         _ => "Calculation error",
     };
 }

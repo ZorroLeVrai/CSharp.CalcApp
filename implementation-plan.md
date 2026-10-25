@@ -147,7 +147,9 @@ Operator priority and associativity (highest binds tightest):
    - Decimals: `1/4` -> `0.25`
    - Division by zero -> `DivisionByZero` (including a nested zero such as `1/(2-2)`). Note that `double` division by zero does not throw in .NET (it gives infinity or `NaN`), so the check must be explicit.
    - Power with `Math.Pow` (for example `2^0.5` is approximately `Math.Sqrt(2)`; use `Assert.Equal(expected, actual, precision)` or a tolerance, not exact equality)
+   - Negative base with a fractional exponent `p/q` (in lowest terms): real when `q` is odd, with sign `(-1)^p` (`(-8)^(1/3)` = `-2`, `(-8)^(2/3)` = `4`, `(-8)^(2/6)` = `-2` because `2/6` reduces to `1/3`); `DomainError` when `q` is even (`(-4)^(1/2)`, `(-8)^(1/6)`) or the exponent is not close to a fraction (`(-8)^0.3333`)
 2. **Implementation**
+   - `Math.Pow` returns `NaN` for every negative base with a non-integer exponent, so the evaluator recovers `p/q` from the `double` exponent with continued fractions (denominator at most 1000, relative tolerance `1e-12`) and computes the odd roots itself.
    - Create `Evaluator.cs` with a recursive `Evaluate(Expr) -> double`, using a `switch` expression over the `Expr` record types.
    - Check for a zero divisor before dividing.
 
@@ -165,7 +167,7 @@ Operator priority and associativity (highest binds tightest):
 2. **Implementation**
    - In `Calculator.cs`: `public static double Evaluate(string input)` chains `Tokenize`, `Parse` and `Evaluate`.
    - Keep the phase classes `internal`; only `Calculator` and `CalcException` are public.
-   - The parser rejects expressions nested deeper than a `MaxDepth` constant (128, chosen so that even deeply nested input stays well within the default stack) with a `CalcErrorKind.ExpressionTooDeep` error. This matters in .NET because a `StackOverflowException` cannot be caught and would crash the process. Stage 7 also adds `CalcErrorKind.DomainError` (negative base with fractional exponent, or a `NaN` result); `0^negative` is `DivisionByZero`; overflow gives infinity.
+   - The parser rejects expressions nested deeper than a `MaxDepth` constant (1024, chosen so that even deeply nested input stays well within the default stack) with a `CalcErrorKind.ExpressionTooDeep` error. This matters in .NET because a `StackOverflowException` cannot be caught and would crash the process. Stage 7 also adds `CalcErrorKind.DomainError` (negative base with a fractional exponent whose reduced denominator is even, or a `NaN` result); `0^negative` is `DivisionByZero`; overflow gives infinity.
 
 **Milestone:** the basic operators work end to end. Move on to Part 2.
 
@@ -266,7 +268,7 @@ The tree design allows evaluating one parsed expression many times with differen
 - [x] Stage 4: Parser, single operations
 - [x] Stage 5: Parser, precedence and associativity
 - [x] Stage 6: Parser, parentheses
-- [ ] Stage 7: Evaluator
+- [x] Stage 7: Evaluator
 - [ ] Stage 8: Public API and end-to-end tests
 - [ ] Stage 9: REPL loop
 - [ ] Stage 10: Manual check

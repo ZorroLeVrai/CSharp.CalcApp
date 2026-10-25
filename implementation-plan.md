@@ -257,6 +257,11 @@ Each item follows the same two steps: tokenizer tests then code, parser tests th
    - Errors: unknown function, missing parentheses, `sqrt(-1)` (domain error)
 2. **Implementation**
    - Add `CallExpr(string Name, Expr Arg)`, parser rule for `name ( expr )`, and a function table (`Dictionary<string, Func<double, double>>`) in the evaluator.
+   - The table lives in `Functions` (shared by the parser, which checks that a name is a function, and the evaluator, which applies it). The 15 one-argument functions are `sqrt abs exp ln log log2 sin cos tan asin acos atan floor ceil round`: lowercase and case-sensitive, angles in radians, `ln` natural, `log` base 10, `log2` base 2 (`Math.Log2`, added after the first version of this stage), `round` halves away from zero. `log2` is one name (an identifier may contain digits): `log2(8)` is a call, while `log 2` is the function `log` followed by a number, an error.
+   - A call is `name ( expr )`. A known function without `(` after it is an error (`sqrt` is `UnexpectedEnd`, `sqrt 4` and `sqrt+1` are `UnexpectedToken`); `foo(2)` and `Sqrt(4)` are `UnknownIdentifier`; `pi(2)` stays `UnexpectedToken` (a constant is not a function). Several arguments are not supported (`,` is an unexpected character).
+   - Outside its domain a function gives `NaN`, reported as `DomainError`: `sqrt(-1)`, `asin(2)`, `acos(2)` and also `ln(0)`, `log(0)` and `log2(0)` (which .NET evaluates to -infinity). Overflow still gives infinity (`exp(1000)`).
+   - A call counts as one level of nesting and one level of tree height, like a negation or a group (1024 nested calls work, 1025 give `ExpressionTooDeep`).
+   - Add the functions to the REPL's `help` text (and to its test).
 
 ### Stage 15: Variables (future, not part of the current scope)
 
@@ -287,4 +292,4 @@ The tree design allows evaluating one parsed expression many times with differen
 - [x] Stage 11: Unary minus
 - [x] Stage 12: Modulo
 - [x] Stage 13: Constants
-- [ ] Stage 14: Functions
+- [x] Stage 14: Functions

@@ -117,6 +117,7 @@ public class TokenizerTests
     [InlineData("Pi")]
     [InlineData("x1")]
     [InlineData("abc123")]
+    [InlineData("log2")]
     [InlineData("e5")]
     public void Tokenize_ReadsAnIdentifier(string name)
     {
@@ -176,6 +177,27 @@ public class TokenizerTests
                 new IdentifierToken("sqrt"), new LeftParenToken(), new NumberToken(4), new RightParenToken(),
             },
             tokens);
+    }
+
+    [Fact]
+    public void Tokenize_Log2Call_ReadsTheDigitAsPartOfTheName()
+    {
+        var tokens = Tokenizer.Tokenize("log2(8)");
+
+        Assert.Equal(
+            new Token[]
+            {
+                new IdentifierToken("log2"), new LeftParenToken(), new NumberToken(8), new RightParenToken(),
+            },
+            tokens);
+    }
+
+    [Fact]
+    public void Tokenize_LogSpaceTwo_IsANameAndANumber()
+    {
+        var tokens = Tokenizer.Tokenize("log 2");
+
+        Assert.Equal(new Token[] { new IdentifierToken("log"), new NumberToken(2) }, tokens);
     }
 
     [Fact]

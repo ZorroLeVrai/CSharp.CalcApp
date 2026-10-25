@@ -6,6 +6,8 @@ internal sealed record NumberExpr(double Value) : Expr;
 
 internal sealed record ConstantExpr(string Name, double Value) : Expr;
 
+internal sealed record CallExpr(string Name, Expr Argument) : Expr;
+
 internal enum UnaryOperator
 {
     Neg,

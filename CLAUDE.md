@@ -2,7 +2,7 @@
 
 ## Project overview
 
-> **Status: scaffolded, not yet implemented.** The solution and the four projects exist and build, but contain no calculator code or tests yet. Features are added stage by stage following [implementation-plan.md](implementation-plan.md). The files named below that do not exist yet (e.g. `Calculator.cs`) are the intended design.
+> **Status: implemented.** All planned stages (1 to 14 in [implementation-plan.md](implementation-plan.md)) are done: the library, the REPL and their tests. Stage 15 (variables) is out of scope.
 >
 > Shared build settings (net10.0, C# 14, nullable, warnings as errors) are in `Directory.Build.props`. `nuget.config` pins nuget.org as the package source. Test projects see internals through `InternalsVisibleTo`.
 
@@ -17,7 +17,7 @@ The solution contains four projects:
 
 ## Layout
 
-Layout (projects exist; source files such as `Calculator.cs` are still to be written; also present: `Directory.Build.props`, `nuget.config`, `.gitignore`):
+Also at the root: `Directory.Build.props`, `nuget.config`, `.gitignore`, `README.md`, `project-scope.md`, `implementation-plan.md`.
 
 ```
 CSharp.calc/
@@ -27,12 +27,21 @@ CSharp.calc/
 ├── src/
 │   ├── Calc.Lib/            # library: parsing + evaluation, no I/O
 │   │   ├── Calc.Lib.csproj
-│   │   └── Calculator.cs
+│   │   ├── Calculator.cs    # the only public entry point: Calculator.Evaluate(string)
+│   │   ├── CalcException.cs # CalcException + CalcErrorKind (public)
+│   │   ├── Tokenizer.cs     # string -> tokens
+│   │   ├── Token.cs         # token types and the Operator enum
+│   │   ├── Parser.cs        # tokens -> tree (precedence, depth limit)
+│   │   ├── Expr.cs          # expression tree types
+│   │   ├── Evaluator.cs     # tree -> number
+│   │   ├── Constants.cs     # pi, e
+│   │   └── Functions.cs     # sqrt, sin, ...
 │   └── Calc.Tui/            # console app: REPL front end
 │       ├── Calc.Tui.csproj
-│       └── Program.cs
+│       ├── Program.cs
+│       └── Repl.cs          # Repl.Run(TextReader, TextWriter)
 └── tests/
-    ├── Calc.Lib.Tests/      # xUnit tests for Calc.Lib
+    ├── Calc.Lib.Tests/      # xUnit tests for Calc.Lib (one file per class, plus CalculatorTests end to end)
     │   └── Calc.Lib.Tests.csproj
     └── Calc.Tui.Tests/      # xUnit tests for the Calc.Tui REPL
         └── Calc.Tui.Tests.csproj

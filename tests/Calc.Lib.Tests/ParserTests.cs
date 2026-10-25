@@ -347,7 +347,7 @@ public class ParserTests
     public void Parse_LongChainOfConstants_Works()
     {
         var tokens = new List<Token> { Id("pi") };
-        for (var i = 0; i < 1024; i++)
+        for (var i = 0; i < TestConstants.MaxDepthLimit; i++)
         {
             tokens.Add(Op(Operator.Add));
             tokens.Add(Id("e"));
@@ -355,7 +355,418 @@ public class ParserTests
 
         var expr = Parser.Parse(tokens);
 
-        Assert.Equal(1025, CountNumbers(expr));
+        Assert.Equal(TestConstants.MaxDepthLimit + 1, CountNumbers(expr));
+    }
+
+    private static CallExpr Call(string name, Expr argument) => new(name, argument);
+
+    private static List<Token> NestedCalls(int depth, string name = "abs", double num = 0)
+    {
+        var tokens = new List<Token>();
+        for (var i = 0; i < depth; i++)
+        {
+            tokens.Add(Id(name));
+            tokens.Add(LParen());
+        }
+
+        tokens.Add(Num(num));
+        tokens.AddRange(Enumerable.Repeat<Token>(RParen(), depth));
+        return tokens;
+    }
+
+    [Fact]
+    public void Parse_FunctionCall()
+    {
+        // sqrt(16)
+        var expr = Parser.Parse([Id("sqrt"), LParen(), Num(16), RParen()]);
+
+        Assert.Equal(Call("sqrt", N(16)), expr);
+    }
+
+    [Theory]
+    [InlineData("sqrt")]
+    [InlineData("abs")]
+    [InlineData("exp")]
+    [InlineData("ln")]
+    [InlineData("log")]
+    [InlineData("log2")]
+    [InlineData("sin")]
+    [InlineData("cos")]
+    [InlineData("tan")]
+    [InlineData("asin")]
+    [InlineData("acos")]
+    [InlineData("atan")]
+    [InlineData("floor")]
+    [InlineData("ceil")]
+    [InlineData("round")]
+    public void Parse_EveryKnownFunction(string name)
+    {
+        var expr = Parser.Parse([Id(name), LParen(), Num(1), RParen()]);
+
+        Assert.Equal(Call(name, N(1)), expr);
+    }
+
+    [Fact]
+    public void Parse_FunctionWithAnExpressionArgument()
+    {
+        // sqrt(2+3*4)
+        var expr = Parser.Parse(
+            [Id("sqrt"), LParen(), Num(2), Op(Operator.Add), Num(3), Op(Operator.Mul), Num(4), RParen()]);
+
+        Assert.Equal(Call("sqrt", B(Operator.Add, N(2), B(Operator.Mul, N(3), N(4)))), expr);
+    }
+
+    [Fact]
+    public void Parse_FunctionResultUsedInAnExpression()
+    {
+        // sqrt(2+2)*3
+        var expr = Parser.Parse(
+            [Id("sqrt"), LParen(), Num(2), Op(Operator.Add), Num(2), RParen(), Op(Operator.Mul), Num(3)]);
+
+        Assert.Equal(B(Operator.Mul, Call("sqrt", B(Operator.Add, N(2), N(2))), N(3)), expr);
+    }
+
+    [Fact]
+    public void Parse_FunctionAsTheRightOperand()
+    {
+        // 1+sqrt(4)
+        var expr = Parser.Parse([Num(1), Op(Operator.Add), Id("sqrt"), LParen(), Num(4), RParen()]);
+
+        Assert.Equal(B(Operator.Add, N(1), Call("sqrt", N(4))), expr);
+    }
+
+    [Fact]
+    public void Parse_NegatedFunction()
+    {
+        // -sqrt(4)
+        var expr = Parser.Parse([Op(Operator.Sub), Id("sqrt"), LParen(), Num(4), RParen()]);
+
+        Assert.Equal(Neg(Call("sqrt", N(4))), expr);
+    }
+
+    [Fact]
+    public void Parse_NegatedFunctionRaisedToAPower_NegatesTheWholePower()
+    {
+        // -sqrt(4)^2 is -(sqrt(4)^2)
+        var expr = Parser.Parse(
+            [Op(Operator.Sub), Id("sqrt"), LParen(), Num(4), RParen(), Op(Operator.Pow), Num(2)]);
+
+        Assert.Equal(Neg(B(Operator.Pow, Call("sqrt", N(4)), N(2))), expr);
+    }
+
+    [Fact]
+    public void Parse_FunctionInTheBaseAndTheExponent()
+    {
+        // sqrt(4)^sqrt(9)
+        var expr = Parser.Parse(
+        [
+            Id("sqrt"), LParen(), Num(4), RParen(), Op(Operator.Pow),
+            Id("sqrt"), LParen(), Num(9), RParen(),
+        ]);
+
+        Assert.Equal(B(Operator.Pow, Call("sqrt", N(4)), Call("sqrt", N(9))), expr);
+    }
+
+    [Fact]
+    public void Parse_NestedFunctions()
+    {
+        // sqrt(abs(16))
+        var expr = Parser.Parse([Id("sqrt"), LParen(), Id("abs"), LParen(), Num(16), RParen(), RParen()]);
+
+        Assert.Equal(Call("sqrt", Call("abs", N(16))), expr);
+    }
+
+    [Fact]
+    public void Parse_FunctionOfAConstant()
+    {
+        // sin(pi)
+        var expr = Parser.Parse([Id("sin"), LParen(), Id("pi"), RParen()]);
+
+        Assert.Equal(Call("sin", Pi), expr);
+    }
+
+    [Fact]
+    public void Parse_FunctionOfANegativeNumber()
+    {
+        // abs(-3)
+        var expr = Parser.Parse([Id("abs"), LParen(), Op(Operator.Sub), Num(3), RParen()]);
+
+        Assert.Equal(Call("abs", Neg(N(3))), expr);
+    }
+
+    [Fact]
+    public void Parse_FunctionWithParenthesisedArgument()
+    {
+        // sqrt((4))
+        var expr = Parser.Parse([Id("sqrt"), LParen(), LParen(), Num(4), RParen(), RParen()]);
+
+        Assert.Equal(Call("sqrt", N(4)), expr);
+    }
+
+    [Fact]
+    public void Parse_ParenthesisedFunction()
+    {
+        // (sqrt(4))
+        var expr = Parser.Parse([LParen(), Id("sqrt"), LParen(), Num(4), RParen(), RParen()]);
+
+        Assert.Equal(Call("sqrt", N(4)), expr);
+    }
+
+    [Fact]
+    public void Parse_FunctionBeforeModulo()
+    {
+        // sqrt(16)%3
+        var expr = Parser.Parse([Id("sqrt"), LParen(), Num(16), RParen(), Op(Operator.Mod), Num(3)]);
+
+        Assert.Equal(B(Operator.Mod, Call("sqrt", N(16)), N(3)), expr);
+    }
+
+    [Theory]
+    [InlineData("foo")]
+    [InlineData("Sqrt")]
+    [InlineData("SQRT")]
+    [InlineData("sqr")]
+    [InlineData("sqrt2")]
+    public void Parse_UnknownFunction_Throws(string name)
+    {
+        var ex = Assert.Throws<CalcException>(() => Parser.Parse([Id(name), LParen(), Num(2), RParen()]));
+
+        Assert.Equal(CalcErrorKind.UnknownIdentifier, ex.Kind);
+        Assert.Contains($"'{name}'", ex.Message);
+    }
+
+    [Theory]
+    [InlineData("pi")]
+    [InlineData("e")]
+    public void Parse_ConstantCalledLikeAFunction_Throws(string name)
+    {
+        var ex = Assert.Throws<CalcException>(() => Parser.Parse([Id(name), LParen(), Num(2), RParen()]));
+
+        Assert.Equal(CalcErrorKind.UnexpectedToken, ex.Kind);
+    }
+
+    [Fact]
+    public void Parse_Log2AndLogAreDifferentFunctions()
+    {
+        // log2(8)*log(100)
+        var expr = Parser.Parse(
+        [
+            Id("log2"), LParen(), Num(8), RParen(), Op(Operator.Mul),
+            Id("log"), LParen(), Num(100), RParen(),
+        ]);
+
+        Assert.Equal(B(Operator.Mul, Call("log2", N(8)), Call("log", N(100))), expr);
+    }
+
+    [Fact]
+    public void Parse_Log2WithoutParentheses_Throws()
+    {
+        // log2 8
+        var ex = Assert.Throws<CalcException>(() => Parser.Parse([Id("log2"), Num(8)]));
+
+        Assert.Equal(CalcErrorKind.UnexpectedToken, ex.Kind);
+    }
+
+    [Fact]
+    public void Parse_LogFollowedByANumber_IsNotLog2()
+    {
+        // log 2 is the function log without its parentheses, not log2
+        var ex = Assert.Throws<CalcException>(() => Parser.Parse([Id("log"), Num(2)]));
+
+        Assert.Equal(CalcErrorKind.UnexpectedToken, ex.Kind);
+    }
+
+    [Fact]
+    public void Parse_FunctionNameAloneAtTheEnd_Throws()
+    {
+        // sqrt
+        var ex = Assert.Throws<CalcException>(() => Parser.Parse([Id("sqrt")]));
+
+        Assert.Equal(CalcErrorKind.UnexpectedEnd, ex.Kind);
+    }
+
+    [Fact]
+    public void Parse_FunctionNameWithoutParentheses_Throws()
+    {
+        // sqrt 4
+        var ex = Assert.Throws<CalcException>(() => Parser.Parse([Id("sqrt"), Num(4)]));
+
+        Assert.Equal(CalcErrorKind.UnexpectedToken, ex.Kind);
+    }
+
+    [Fact]
+    public void Parse_FunctionNameInsideAnExpressionWithoutParentheses_Throws()
+    {
+        // sqrt+1
+        var ex = Assert.Throws<CalcException>(() => Parser.Parse([Id("sqrt"), Op(Operator.Add), Num(1)]));
+
+        Assert.Equal(CalcErrorKind.UnexpectedToken, ex.Kind);
+    }
+
+    [Fact]
+    public void Parse_FunctionWithAnEmptyArgument_Throws()
+    {
+        // sqrt()
+        var ex = Assert.Throws<CalcException>(() => Parser.Parse([Id("sqrt"), LParen(), RParen()]));
+
+        Assert.Equal(CalcErrorKind.UnexpectedToken, ex.Kind);
+    }
+
+    [Fact]
+    public void Parse_FunctionWithAnOpeningParenthesisAtTheEnd_Throws()
+    {
+        // sqrt(
+        var ex = Assert.Throws<CalcException>(() => Parser.Parse([Id("sqrt"), LParen()]));
+
+        Assert.Equal(CalcErrorKind.UnexpectedEnd, ex.Kind);
+    }
+
+    [Fact]
+    public void Parse_FunctionMissingItsClosingParenthesis_Throws()
+    {
+        // sqrt(4
+        var ex = Assert.Throws<CalcException>(() => Parser.Parse([Id("sqrt"), LParen(), Num(4)]));
+
+        Assert.Equal(CalcErrorKind.UnbalancedParentheses, ex.Kind);
+    }
+
+    [Fact]
+    public void Parse_FunctionWithAnExtraClosingParenthesis_Throws()
+    {
+        // sqrt(4))
+        var ex = Assert.Throws<CalcException>(
+            () => Parser.Parse([Id("sqrt"), LParen(), Num(4), RParen(), RParen()]));
+
+        Assert.Equal(CalcErrorKind.UnbalancedParentheses, ex.Kind);
+    }
+
+    [Fact]
+    public void Parse_FunctionWithADanglingOperatorInItsArgument_Throws()
+    {
+        // sqrt(4+)
+        var ex = Assert.Throws<CalcException>(
+            () => Parser.Parse([Id("sqrt"), LParen(), Num(4), Op(Operator.Add), RParen()]));
+
+        Assert.Equal(CalcErrorKind.UnexpectedToken, ex.Kind);
+    }
+
+    [Fact]
+    public void Parse_FunctionWithTwoNumbersInItsArgument_Throws()
+    {
+        // sqrt(4 4)
+        var ex = Assert.Throws<CalcException>(
+            () => Parser.Parse([Id("sqrt"), LParen(), Num(4), Num(4), RParen()]));
+
+        Assert.Equal(CalcErrorKind.UnexpectedToken, ex.Kind);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Parse_FunctionNextToAnOperandWithoutAnOperator_Throws(bool numberFirst)
+    {
+        // 2sqrt(4) and sqrt(4)2
+        Token[] call = [Id("sqrt"), LParen(), Num(4), RParen()];
+        Token[] tokens = numberFirst ? [Num(2), .. call] : [.. call, Num(2)];
+
+        var ex = Assert.Throws<CalcException>(() => Parser.Parse(tokens));
+
+        Assert.Equal(CalcErrorKind.UnexpectedToken, ex.Kind);
+    }
+
+    [Fact]
+    public void Parse_TwoFunctionsInARow_Throws()
+    {
+        // sqrt(4)sqrt(4)
+        Token[] call = [Id("sqrt"), LParen(), Num(4), RParen()];
+
+        var ex = Assert.Throws<CalcException>(() => Parser.Parse([.. call, .. call]));
+
+        Assert.Equal(CalcErrorKind.UnexpectedToken, ex.Kind);
+    }
+
+    [Fact]
+    public void Parse_UnknownFunctionInsideAnExpression_Throws()
+    {
+        // 1+foo(2)*3
+        var ex = Assert.Throws<CalcException>(
+            () => Parser.Parse([Num(1), Op(Operator.Add), Id("foo"), LParen(), Num(2), RParen()]));
+
+        Assert.Equal(CalcErrorKind.UnknownIdentifier, ex.Kind);
+    }
+
+    [Fact]
+    public void Parse_NestedCallsUpToTheLimit_Work()
+    {
+        var expr = Parser.Parse(NestedCalls(TestConstants.MaxDepthLimit));
+
+        var depth = 0;
+        while (expr is CallExpr call)
+        {
+            depth++;
+            expr = call.Argument;
+        }
+
+        Assert.Equal(TestConstants.MaxDepthLimit, depth);
+        Assert.Equal(N(0), expr);
+    }
+
+    [Fact]
+    public void Parse_NestedCallsBeyondTheLimit_AreTooDeep()
+    {
+        var ex = Assert.Throws<CalcException>(() => Parser.Parse(NestedCalls(TestConstants.MaxDepthLimit + 1)));
+
+        Assert.Equal(CalcErrorKind.ExpressionTooDeep, ex.Kind);
+    }
+
+    [Fact]
+    public void Parse_HugeNumberOfNestedCalls_IsRejectedWithoutOverflowingTheStack()
+    {
+        var ex = Assert.Throws<CalcException>(() => Parser.Parse(NestedCalls(200_000)));
+
+        Assert.Equal(CalcErrorKind.ExpressionTooDeep, ex.Kind);
+    }
+
+    [Fact]
+    public void Parse_NestedCallsMixedWithParenthesesAndNegations_CountTowardsTheSameLimit()
+    {
+        // abs(-(abs(-(...)))): each level adds a call, a negation and a group
+        var tokens = new List<Token>();
+        const int levels = 400;
+        for (var i = 0; i < levels; i++)
+        {
+            tokens.AddRange([Id("abs"), LParen(), Op(Operator.Sub), LParen()]);
+        }
+
+        tokens.Add(Num(1));
+        for (var i = 0; i < levels; i++)
+        {
+            tokens.AddRange([RParen(), RParen()]);
+        }
+
+        var ex = Assert.Throws<CalcException>(() => Parser.Parse(tokens));
+
+        Assert.Equal(CalcErrorKind.ExpressionTooDeep, ex.Kind);
+    }
+
+    [Fact]
+    public void Parse_LongChainOfCalls_Works()
+    {
+        // abs(1)+abs(1)+...: 600 calls chained with additions
+        var tokens = new List<Token>();
+        for (var i = 0; i < 600; i++)
+        {
+            if (i > 0)
+            {
+                tokens.Add(Op(Operator.Add));
+            }
+
+            tokens.AddRange([Id("abs"), LParen(), Num(1), RParen()]);
+        }
+
+        var expr = Parser.Parse(tokens);
+
+        Assert.Equal(600, CountNumbers(expr));
     }
 
     [Fact]
@@ -690,34 +1101,34 @@ public class ParserTests
     [InlineData(Operator.Div)]
     [InlineData(Operator.Pow)]
     [InlineData(Operator.Mod)]
-    public void Parse_LongChainOf1024Operators_DoesNotOverflow(Operator op)
+    public void Parse_ChainAtTheDepthLimit_DoesNotOverflow(Operator op)
     {
-        var tokens = LongChain(1024, _ => op);
+        var tokens = LongChain(TestConstants.MaxDepthLimit, _ => op);
 
         var expr = Parser.Parse(tokens);
 
-        Assert.Equal(1025, CountNumbers(expr));
+        Assert.Equal(TestConstants.MaxDepthLimit + 1, CountNumbers(expr));
     }
 
     [Fact]
-    public void Parse_LongChainOf1024MixedOperators_DoesNotOverflow()
+    public void Parse_MixedOperatorChainAtTheDepthLimit_DoesNotOverflow()
     {
         Operator[] cycle = [Operator.Add, Operator.Sub, Operator.Mul, Operator.Div, Operator.Pow, Operator.Mod];
-        var tokens = LongChain(1024, i => cycle[i % cycle.Length]);
+        var tokens = LongChain(TestConstants.MaxDepthLimit, i => cycle[i % cycle.Length]);
 
         var expr = Parser.Parse(tokens);
 
-        Assert.Equal(1025, CountNumbers(expr));
+        Assert.Equal(TestConstants.MaxDepthLimit + 1, CountNumbers(expr));
     }
 
     [Fact]
     public void Parse_LongChainViaTokenizer_DoesNotOverflow()
     {
-        var input = string.Join("+", Enumerable.Repeat("1", 1025));
+        var input = string.Join("+", Enumerable.Repeat("1", TestConstants.MaxDepthLimit + 1));
 
         var expr = Parser.Parse(Tokenizer.Tokenize(input));
 
-        Assert.Equal(1025, CountNumbers(expr));
+        Assert.Equal(TestConstants.MaxDepthLimit + 1, CountNumbers(expr));
     }
 
     [Theory]
@@ -727,9 +1138,9 @@ public class ParserTests
     [InlineData(Operator.Div)]
     [InlineData(Operator.Pow)]
     [InlineData(Operator.Mod)]
-    public void Parse_ChainOf1025Operators_IsTooDeep(Operator op)
+    public void Parse_ChainOneOverTheDepthLimit_IsTooDeep(Operator op)
     {
-        var ex = Assert.Throws<CalcException>(() => Parser.Parse(LongChain(1025, _ => op)));
+        var ex = Assert.Throws<CalcException>(() => Parser.Parse(LongChain(TestConstants.MaxDepthLimit + 1, _ => op)));
 
         Assert.Equal(CalcErrorKind.ExpressionTooDeep, ex.Kind);
     }
@@ -747,7 +1158,7 @@ public class ParserTests
     [Fact]
     public void Parse_ParenthesesNestedUpToTheLimit_Work()
     {
-        var expr = Parser.Parse(NestedParentheses(1024));
+        var expr = Parser.Parse(NestedParentheses(TestConstants.MaxDepthLimit));
 
         Assert.Equal(N(0), expr);
     }
@@ -755,7 +1166,7 @@ public class ParserTests
     [Fact]
     public void Parse_ParenthesesNestedBeyondTheLimit_AreTooDeep()
     {
-        var ex = Assert.Throws<CalcException>(() => Parser.Parse(NestedParentheses(1025)));
+        var ex = Assert.Throws<CalcException>(() => Parser.Parse(NestedParentheses(TestConstants.MaxDepthLimit + 1)));
 
         Assert.Equal(CalcErrorKind.ExpressionTooDeep, ex.Kind);
     }
@@ -1079,11 +1490,11 @@ public class ParserTests
     }
 
     [Fact]
-    public void Parse_ThousandAndTwentyFourNegations_Work()
+    public void Parse_NegationsAtTheDepthLimit_Work()
     {
-        var expr = Parser.Parse(Minuses(1024, 5));
+        var expr = Parser.Parse(Minuses(TestConstants.MaxDepthLimit, 5));
 
-        // the innermost operand is reached after exactly 1024 unary levels
+        // the innermost operand is reached after exactly TestConstants.MaxDepthLimit unary levels
         var depth = 0;
         while (expr is UnaryExpr unary)
         {
@@ -1091,14 +1502,14 @@ public class ParserTests
             expr = unary.Operand;
         }
 
-        Assert.Equal(1024, depth);
+        Assert.Equal(TestConstants.MaxDepthLimit, depth);
         Assert.Equal(N(5), expr);
     }
 
     [Fact]
-    public void Parse_ThousandAndTwentyFiveNegations_AreTooDeep()
+    public void Parse_NegationsOneOverTheDepthLimit_AreTooDeep()
     {
-        var ex = Assert.Throws<CalcException>(() => Parser.Parse(Minuses(1025)));
+        var ex = Assert.Throws<CalcException>(() => Parser.Parse(Minuses(TestConstants.MaxDepthLimit + 1)));
 
         Assert.Equal(CalcErrorKind.ExpressionTooDeep, ex.Kind);
     }
@@ -1195,6 +1606,9 @@ public class ParserTests
                     break;
                 case UnaryExpr unary:
                     pending.Push(unary.Operand);
+                    break;
+                case CallExpr call:
+                    pending.Push(call.Argument);
                     break;
             }
         }

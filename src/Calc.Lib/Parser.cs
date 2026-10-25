@@ -77,9 +77,7 @@ internal sealed class Parser
 
             case IdentifierToken identifier:
                 _position++;
-                return Constants.TryGet(identifier.Name, out var value)
-                    ? (new ConstantExpr(identifier.Name, value), 0)
-                    : throw new CalcException(CalcErrorKind.UnknownIdentifier, identifier.Name);
+                return ParseName(identifier.Name);
 
             case LeftParenToken:
                 _position++;
@@ -103,6 +101,40 @@ internal sealed class Parser
             default:
                 throw new CalcException(CalcErrorKind.UnexpectedToken);
         }
+    }
+
+    // A known function must be followed by "(" argument ")". Anything else that is not a known constant
+    // is an unknown name (foo, foo(2), PI): reported while parsing, before anything is evaluated.
+    private (Expr Expr, int Height) ParseName(string name)
+    {
+        if (Functions.IsDefined(name))
+        {
+            if (_position >= _tokens.Count)
+            {
+                throw new CalcException(CalcErrorKind.UnexpectedEnd);
+            }
+
+            if (_tokens[_position] is not LeftParenToken)
+            {
+                throw new CalcException(CalcErrorKind.UnexpectedToken);
+            }
+
+            _position++;
+            EnterNesting();
+            var (argument, argumentHeight) = ParseExpression(0);
+            ExitNesting();
+            ExpectRightParen();
+
+            CheckHeight(argumentHeight + 1);
+            return (new CallExpr(name, argument), argumentHeight + 1);
+        }
+
+        if (Constants.TryGet(name, out var value))
+        {
+            return (new ConstantExpr(name, value), 0);
+        }
+
+        throw new CalcException(CalcErrorKind.UnknownIdentifier, name);
     }
 
     private void EnterNesting()

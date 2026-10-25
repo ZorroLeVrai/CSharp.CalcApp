@@ -156,6 +156,23 @@ public class ReplTests
     }
 
     [Fact]
+    public void Run_HelpListsTheFunctions()
+    {
+        var help = HelpOutput();
+
+        Assert.Contains("Functions", help);
+        foreach (var name in new[]
+        {
+            "sqrt", "abs", "exp", "ln", "log", "log2", "sin", "cos", "tan", "asin", "acos", "atan", "floor", "ceil", "round",
+        })
+        {
+            Assert.Contains(name, help);
+        }
+
+        Assert.Contains("radians", help);
+    }
+
+    [Fact]
     public void Run_HelpIsShort()
     {
         var lines = HelpOutput().Split('\n', StringSplitOptions.RemoveEmptyEntries);
@@ -300,6 +317,47 @@ public class ReplTests
     public void Run_Constants(string line, string expected)
     {
         Assert.Equal($"> {expected}\n> ", Run(line + "\nquit\n"));
+    }
+
+    [Theory]
+    [InlineData("sqrt(16)", "4")]
+    [InlineData("sqrt(2)", "1.41421356237")]
+    [InlineData("sin(pi/2)", "1")]
+    [InlineData("cos(0)", "1")]
+    [InlineData("round(2.5)", "3")]
+    [InlineData("round(-2.5)", "-3")]
+    [InlineData("floor(-2.1)", "-3")]
+    [InlineData("abs(0-7)", "7")]
+    [InlineData("ln(e)", "1")]
+    [InlineData("log(1000)", "3")]
+    [InlineData("log2(8)", "3")]
+    [InlineData("log2(1024)", "10")]
+    [InlineData("log2(10)", "3.32192809489")]
+    [InlineData("log2(0.5)", "-1")]
+    [InlineData("sqrt(2+2)*3", "6")]
+    [InlineData("exp(1000)", "inf")]
+    [InlineData("round(-0.4)", "0")]
+    public void Run_Functions(string line, string expected)
+    {
+        Assert.Equal($"> {expected}\n> ", Run(line + "\nquit\n"));
+    }
+
+    [Theory]
+    [InlineData("sqrt(-1)", "Error: Result is not a real number")]
+    [InlineData("ln(0)", "Error: Result is not a real number")]
+    [InlineData("log2(0)", "Error: Result is not a real number")]
+    [InlineData("log2(0-4)", "Error: Result is not a real number")]
+    [InlineData("Log2(8)", "Error: Unknown name 'Log2'")]
+    [InlineData("foo(1)", "Error: Unknown name 'foo'")]
+    [InlineData("sqrt", "Error: Unexpected end of expression")]
+    [InlineData("sqrt()", "Error: Unexpected token")]
+    public void Run_FunctionErrorsAreShownAndTheLoopContinues(string line, string expectedError)
+    {
+        var output = Run(line + "\n1+1\nquit\n");
+
+        var lines = output.Split('\n');
+        Assert.Equal("> " + expectedError, lines[0]);
+        Assert.Equal("> 2", lines[1]);
     }
 
     [Fact]

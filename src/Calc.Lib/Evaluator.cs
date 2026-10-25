@@ -6,6 +6,7 @@ internal static class Evaluator
     {
         NumberExpr number => number.Value,
         ConstantExpr constant => constant.Value,
+        CallExpr call => Apply(call.Name, Evaluate(call.Argument)),
         UnaryExpr unary => Apply(unary.Op, Evaluate(unary.Operand)),
         BinaryExpr binary => Apply(binary.Op, Evaluate(binary.Left), Evaluate(binary.Right)),
         _ => throw new InvalidOperationException($"Unknown expression type {expr.GetType().Name}"),
@@ -30,11 +31,19 @@ internal static class Evaluator
             _ => throw new ArgumentOutOfRangeException(nameof(op), op, "Unknown operator"),
         };
 
-        // Overflow to infinity is allowed; NaN (e.g. infinity - infinity) is not a real number.
-        return double.IsNaN(result)
+        return RequireReal(result);
+    }
+
+    private static double Apply(string function, double argument) =>
+        Functions.TryGet(function, out var apply)
+            ? RequireReal(apply(argument))
+            : throw new CalcException(CalcErrorKind.UnknownIdentifier, function);
+
+    // Overflow to infinity is allowed; NaN (e.g. infinity - infinity, sqrt(-1)) is not a real number.
+    private static double RequireReal(double result) =>
+        double.IsNaN(result)
             ? throw new CalcException(CalcErrorKind.DomainError)
             : result;
-    }
 
     // double division by zero does not throw in .NET, so it has to be checked explicitly.
     private static double Divide(double left, double right) =>

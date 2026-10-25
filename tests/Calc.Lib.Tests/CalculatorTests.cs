@@ -139,6 +139,123 @@ public class CalculatorTests
         Assert.Equal(expected, ex.Kind);
     }
 
+    [Theory]
+    [InlineData("sqrt(16)", 4)]
+    [InlineData("abs(-3)", 3)]
+    [InlineData("exp(0)", 1)]
+    [InlineData("ln(e)", 1)]
+    [InlineData("log(1000)", 3)]
+    [InlineData("log2(8)", 3)]
+    [InlineData("log2(1024)", 10)]
+    [InlineData("  log2 ( 8 )  ", 3)]
+    [InlineData("sin(0)", 0)]
+    [InlineData("cos(0)", 1)]
+    [InlineData("tan(0)", 0)]
+    [InlineData("asin(1)", Math.PI / 2)]
+    [InlineData("acos(1)", 0)]
+    [InlineData("atan(1)", Math.PI / 4)]
+    [InlineData("floor(2.7)", 2)]
+    [InlineData("ceil(2.1)", 3)]
+    [InlineData("round(2.5)", 3)]
+    [InlineData("sqrt(2+2)*3", 6)]
+    [InlineData("sin(pi/2)", 1)]
+    [InlineData("  sqrt (  16  )  ", 4)]
+    [InlineData("sqrt\t(16)", 4)]
+    [InlineData("-sqrt(16)", -4)]
+    [InlineData("2^sqrt(4)", 4)]
+    [InlineData("sqrt(abs(-16))", 4)]
+    public void Evaluate_Functions(string input, double expected)
+    {
+        Assert.Equal(expected, Calculator.Evaluate(input), Precision);
+    }
+
+    [Theory]
+    [InlineData("foo(2)", "foo")]
+    [InlineData("Sqrt(4)", "Sqrt")]
+    [InlineData("SQRT(4)", "SQRT")]
+    [InlineData("sqr(4)", "sqr")]
+    [InlineData("Log2(8)", "Log2")]
+    [InlineData("log3(8)", "log3")]
+    [InlineData("log22(8)", "log22")]
+    [InlineData("1+bar(2)", "bar")]
+    public void Evaluate_UnknownFunctionIsReportedWithItsName(string input, string name)
+    {
+        var ex = Assert.Throws<CalcException>(() => Calculator.Evaluate(input));
+
+        Assert.Equal(CalcErrorKind.UnknownIdentifier, ex.Kind);
+        Assert.Contains($"'{name}'", ex.Message);
+    }
+
+    [Theory]
+    [InlineData("sqrt", CalcErrorKind.UnexpectedEnd)]
+    [InlineData("sqrt 4", CalcErrorKind.UnexpectedToken)]
+    [InlineData("sqrt+1", CalcErrorKind.UnexpectedToken)]
+    [InlineData("sqrt()", CalcErrorKind.UnexpectedToken)]
+    [InlineData("sqrt(", CalcErrorKind.UnexpectedEnd)]
+    [InlineData("sqrt(4", CalcErrorKind.UnbalancedParentheses)]
+    [InlineData("sqrt(4))", CalcErrorKind.UnbalancedParentheses)]
+    [InlineData("sqrt(4+)", CalcErrorKind.UnexpectedToken)]
+    [InlineData("sqrt(1,2)", CalcErrorKind.UnexpectedCharacter)]
+    [InlineData("sqrt(1 2)", CalcErrorKind.UnexpectedToken)]
+    [InlineData("2sqrt(4)", CalcErrorKind.UnexpectedToken)]
+    [InlineData("sqrt(4)2", CalcErrorKind.UnexpectedToken)]
+    [InlineData("sqrt(4)sqrt(4)", CalcErrorKind.UnexpectedToken)]
+    [InlineData("pi(2)", CalcErrorKind.UnexpectedToken)]
+    [InlineData("e(2)", CalcErrorKind.UnexpectedToken)]
+    [InlineData("sqrt(-1)", CalcErrorKind.DomainError)]
+    [InlineData("ln(0)", CalcErrorKind.DomainError)]
+    [InlineData("asin(2)", CalcErrorKind.DomainError)]
+    [InlineData("log2(0)", CalcErrorKind.DomainError)]
+    [InlineData("log2(-8)", CalcErrorKind.DomainError)]
+    [InlineData("log2", CalcErrorKind.UnexpectedEnd)]
+    [InlineData("log2()", CalcErrorKind.UnexpectedToken)]
+    [InlineData("log2 8", CalcErrorKind.UnexpectedToken)]
+    [InlineData("log 2", CalcErrorKind.UnexpectedToken)]
+    [InlineData("log2(8", CalcErrorKind.UnbalancedParentheses)]
+    [InlineData("log2(1,2)", CalcErrorKind.UnexpectedCharacter)]
+    [InlineData("2log2(8)", CalcErrorKind.UnexpectedToken)]
+    [InlineData("sqrt(1/0)", CalcErrorKind.DivisionByZero)]
+    public void Evaluate_FunctionErrors(string input, CalcErrorKind expected)
+    {
+        var ex = Assert.Throws<CalcException>(() => Calculator.Evaluate(input));
+
+        Assert.Equal(expected, ex.Kind);
+    }
+
+    [Fact]
+    public void Evaluate_ExpOverflow_GivesInfinity()
+    {
+        Assert.True(double.IsPositiveInfinity(Calculator.Evaluate("exp(1000)")));
+    }
+
+    [Fact]
+    public void Evaluate_NestedCallsUpToTheLimit_Work()
+    {
+        var input = string.Concat(Enumerable.Repeat("abs(", TestConstants.MaxDepthLimit)) + "5" + new string(')', TestConstants.MaxDepthLimit);
+
+        Assert.Equal(5, Calculator.Evaluate(input));
+    }
+
+    [Fact]
+    public void Evaluate_NestedCallsBeyondTheLimit_AreTooDeep()
+    {
+        var input = string.Concat(Enumerable.Repeat("abs(", TestConstants.MaxDepthLimit + 1)) + "5" + new string(')', TestConstants.MaxDepthLimit + 1);
+
+        var ex = Assert.Throws<CalcException>(() => Calculator.Evaluate(input));
+
+        Assert.Equal(CalcErrorKind.ExpressionTooDeep, ex.Kind);
+    }
+
+    [Fact]
+    public void Evaluate_HugeNumberOfNestedCalls_IsRejectedInsteadOfCrashing()
+    {
+        var input = string.Concat(Enumerable.Repeat("abs(", 200_000)) + "5" + new string(')', 200_000);
+
+        var ex = Assert.Throws<CalcException>(() => Calculator.Evaluate(input));
+
+        Assert.Equal(CalcErrorKind.ExpressionTooDeep, ex.Kind);
+    }
+
     [Fact]
     public void Evaluate_NegativeBaseWrittenWithUnaryMinus_IsReal()
     {
@@ -166,17 +283,17 @@ public class CalculatorTests
     }
 
     [Fact]
-    public void Evaluate_ThousandAndTwentyFourNegations_Work()
+    public void Evaluate_NegationsAtTheDepthLimit_Work()
     {
-        var input = new string('-', 1024) + "5";
+        var input = new string('-', TestConstants.MaxDepthLimit) + "5";
 
         Assert.Equal(5, Calculator.Evaluate(input));
     }
 
     [Fact]
-    public void Evaluate_ThousandAndTwentyFiveNegations_AreTooDeep()
+    public void Evaluate_NegationsOneOverTheDepthLimit_AreTooDeep()
     {
-        var input = new string('-', 1025) + "5";
+        var input = new string('-', TestConstants.MaxDepthLimit + 1) + "5";
 
         var ex = Assert.Throws<CalcException>(() => Calculator.Evaluate(input));
 
@@ -280,11 +397,11 @@ public class CalculatorTests
     }
 
     [Fact]
-    public void Evaluate_ChainOf1024Operators_Works()
+    public void Evaluate_ChainAtTheDepthLimit_Works()
     {
-        var input = string.Join("+", Enumerable.Repeat("1", 1025));
+        var input = string.Join("+", Enumerable.Repeat("1", TestConstants.MaxDepthLimit + 1));
 
-        Assert.Equal(1025, Calculator.Evaluate(input));
+        Assert.Equal(TestConstants.MaxDepthLimit + 1, Calculator.Evaluate(input));
     }
 
     [Theory]
@@ -293,9 +410,9 @@ public class CalculatorTests
     [InlineData("*")]
     [InlineData("/")]
     [InlineData("^")]
-    public void Evaluate_ChainOf1025Operators_IsTooDeep(string op)
+    public void Evaluate_ChainOneOverTheDepthLimit_IsTooDeep(string op)
     {
-        var input = string.Join(op, Enumerable.Repeat("1", 1026));
+        var input = string.Join(op, Enumerable.Repeat("1", TestConstants.MaxDepthLimit + 2));
 
         var ex = Assert.Throws<CalcException>(() => Calculator.Evaluate(input));
 
@@ -327,7 +444,7 @@ public class CalculatorTests
     [Fact]
     public void Evaluate_ParenthesesNestedUpToTheLimit_Work()
     {
-        var input = new string('(', 1024) + "1" + new string(')', 1024);
+        var input = new string('(', TestConstants.MaxDepthLimit) + "1" + new string(')', TestConstants.MaxDepthLimit);
 
         Assert.Equal(1, Calculator.Evaluate(input));
     }

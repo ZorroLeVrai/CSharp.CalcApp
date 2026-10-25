@@ -379,15 +379,15 @@ public class EvaluatorTests
     [Fact]
     public void Evaluate_LongLeftAssociativeChain_DoesNotOverflow()
     {
-        var input = string.Join("+", Enumerable.Repeat("1", 1025));
+        var input = string.Join("+", Enumerable.Repeat("1", TestConstants.MaxDepthLimit + 1));
 
-        Assert.Equal(1025, EvalSource(input));
+        Assert.Equal(TestConstants.MaxDepthLimit + 1, EvalSource(input));
     }
 
     [Fact]
     public void Evaluate_LongRightAssociativePowerChain_DoesNotOverflow()
     {
-        var input = string.Join("^", Enumerable.Repeat("1", 1025));
+        var input = string.Join("^", Enumerable.Repeat("1", TestConstants.MaxDepthLimit + 1));
 
         Assert.Equal(1, EvalSource(input));
     }
@@ -395,7 +395,7 @@ public class EvaluatorTests
     [Fact]
     public void Evaluate_LongMixedChain_DoesNotOverflow()
     {
-        // 2*3+2*3+...: 1024 operators across two precedence levels
+        // 2*3+2*3+...: 682 additions in a chain, with a multiplication inside every term
         var input = string.Join("+", Enumerable.Repeat("2*3", 683));
 
         Assert.Equal(683 * 6, EvalSource(input));
@@ -612,6 +612,233 @@ public class EvaluatorTests
         var ex = Assert.Throws<CalcException>(() => EvalSource(input));
 
         Assert.Equal(expected, ex.Kind);
+    }
+
+    [Fact]
+    public void Evaluate_CallNode_AppliesTheFunction()
+    {
+        Assert.Equal(4, Evaluator.Evaluate(new CallExpr("sqrt", N(16))));
+    }
+
+    [Fact]
+    public void Evaluate_CallNodeWithAnUnknownFunction_IsReported()
+    {
+        var ex = Assert.Throws<CalcException>(() => Evaluator.Evaluate(new CallExpr("nope", N(1))));
+
+        Assert.Equal(CalcErrorKind.UnknownIdentifier, ex.Kind);
+    }
+
+    [Theory]
+    [InlineData("sqrt(16)", 4)]
+    [InlineData("sqrt(2)", 1.4142135623730951)]
+    [InlineData("sqrt(0)", 0)]
+    [InlineData("abs(0-5)", 5)]
+    [InlineData("abs(5)", 5)]
+    [InlineData("abs(0)", 0)]
+    [InlineData("exp(0)", 1)]
+    [InlineData("exp(1)", Math.E)]
+    [InlineData("exp(0-1)", 1 / Math.E)]
+    [InlineData("ln(1)", 0)]
+    [InlineData("ln(e)", 1)]
+    [InlineData("ln(10)", 2.302585092994046)]
+    [InlineData("log(100)", 2)]
+    [InlineData("log(1000)", 3)]
+    [InlineData("log(1)", 0)]
+    [InlineData("log(0.1)", -1)]
+    [InlineData("log2(1)", 0)]
+    [InlineData("log2(2)", 1)]
+    [InlineData("log2(8)", 3)]
+    [InlineData("log2(1024)", 10)]
+    [InlineData("log2(0.5)", -1)]
+    [InlineData("log2(0.25)", -2)]
+    [InlineData("log2(10)", 3.321928094887362)]
+    [InlineData("log2(e)", 1.4426950408889634)]
+    [InlineData("log2(pi)", 1.6514961294723187)]
+    [InlineData("sin(0)", 0)]
+    [InlineData("sin(pi/2)", 1)]
+    [InlineData("sin(pi)", 0)]
+    [InlineData("sin(pi/6)", 0.5)]
+    [InlineData("cos(0)", 1)]
+    [InlineData("cos(pi)", -1)]
+    [InlineData("cos(pi/2)", 0)]
+    [InlineData("tan(0)", 0)]
+    [InlineData("tan(pi/4)", 1)]
+    [InlineData("asin(0)", 0)]
+    [InlineData("asin(1)", Math.PI / 2)]
+    [InlineData("asin(0-1)", -Math.PI / 2)]
+    [InlineData("acos(1)", 0)]
+    [InlineData("acos(0)", Math.PI / 2)]
+    [InlineData("acos(0-1)", Math.PI)]
+    [InlineData("atan(0)", 0)]
+    [InlineData("atan(1)", Math.PI / 4)]
+    [InlineData("floor(2.7)", 2)]
+    [InlineData("floor(2)", 2)]
+    [InlineData("floor(0-2.1)", -3)]
+    [InlineData("ceil(2.1)", 3)]
+    [InlineData("ceil(2)", 2)]
+    [InlineData("ceil(0-2.7)", -2)]
+    [InlineData("round(2.4)", 2)]
+    [InlineData("round(2.6)", 3)]
+    public void Evaluate_EachFunction(string input, double expected)
+    {
+        Assert.Equal(expected, EvalSource(input), Precision);
+    }
+
+    // halves round away from zero (not to even, which is what Math.Round does by default)
+    [Theory]
+    [InlineData("round(0.5)", 1)]
+    [InlineData("round(1.5)", 2)]
+    [InlineData("round(2.5)", 3)]
+    [InlineData("round(3.5)", 4)]
+    [InlineData("round(-0.5)", -1)]
+    [InlineData("round(-1.5)", -2)]
+    [InlineData("round(-2.5)", -3)]
+    [InlineData("round(-0.4)", 0)]
+    public void Evaluate_RoundHalvesAwayFromZero(string input, double expected)
+    {
+        Assert.Equal(expected, EvalSource(input));
+    }
+
+    [Theory]
+    [InlineData("sqrt(2+2)*3", 6)]
+    [InlineData("2*sqrt(9)", 6)]
+    [InlineData("sqrt(sqrt(16))", 2)]
+    [InlineData("sqrt(3^2+4^2)", 5)]
+    [InlineData("-sqrt(4)", -2)]
+    [InlineData("sqrt(4)^3", 8)]
+    [InlineData("2^sqrt(4)", 4)]
+    [InlineData("sin(pi/2)+cos(0)", 2)]
+    [InlineData("abs(-3)*abs(-2)", 6)]
+    [InlineData("sqrt(16)%3", 1)]
+    [InlineData("ln(e^2)", 2)]
+    [InlineData("exp(ln(5))", 5)]
+    [InlineData("log(10^3)", 3)]
+    [InlineData("floor(7/2)", 3)]
+    [InlineData("round(pi*100)/100", 3.14)]
+    [InlineData("(sqrt(4))", 2)]
+    [InlineData("sqrt((4))", 2)]
+    [InlineData("10/sqrt(4)", 5)]
+    [InlineData("1 + sqrt( 4 )", 3)]
+    [InlineData("sqrt(abs(-16))", 4)]
+    [InlineData("abs(sqrt(16)-5)", 1)]
+    [InlineData("-sqrt(4)^2", -4)]
+    [InlineData("sin(0)^2+cos(0)^2", 1)]
+    [InlineData("sqrt(-4+8)", 2)]
+    [InlineData("sqrt(1)+sqrt(4)+sqrt(9)", 6)]
+    [InlineData("log2(2^10)", 10)]
+    [InlineData("2^log2(8)", 8)]
+    [InlineData("log2(8)+log(100)", 5)]
+    [InlineData("log2(sqrt(16))", 2)]
+    [InlineData("log2(8)*log2(4)", 6)]
+    [InlineData("log2(8)%2", 1)]
+    [InlineData("-log2(8)", -3)]
+    [InlineData("log2(1/8)", -3)]
+    [InlineData("log2(2)^log2(8)", 1)]
+    [InlineData("2^log2(5)", 5)]
+    [InlineData("floor(log2(1000))", 9)]
+    public void Evaluate_FunctionsCombinedWithOperators(string input, double expected)
+    {
+        Assert.Equal(expected, EvalSource(input), Precision);
+    }
+
+    [Theory]
+    [InlineData("sqrt(-1)")]
+    [InlineData("sqrt(0-1)")]
+    [InlineData("ln(0)")]
+    [InlineData("ln(-1)")]
+    [InlineData("log(0)")]
+    [InlineData("log(-5)")]
+    [InlineData("log2(0)")]
+    [InlineData("log2(-1)")]
+    [InlineData("log2(0-8)")]
+    [InlineData("log2(1-2)")]
+    [InlineData("log2(0*5)")]
+    [InlineData("asin(2)")]
+    [InlineData("asin(-2)")]
+    [InlineData("acos(2)")]
+    [InlineData("acos(-1.5)")]
+    [InlineData("sin(10^400)")]
+    [InlineData("cos(10^400)")]
+    [InlineData("tan(10^400)")]
+    [InlineData("sqrt(1-2)")]
+    [InlineData("ln(0-e)")]
+    public void Evaluate_FunctionOutsideItsDomain_IsADomainError(string input)
+    {
+        var ex = Assert.Throws<CalcException>(() => EvalSource(input));
+
+        Assert.Equal(CalcErrorKind.DomainError, ex.Kind);
+    }
+
+    [Theory]
+    [InlineData("sqrt(1/0)", CalcErrorKind.DivisionByZero)]
+    [InlineData("1/sin(0)", CalcErrorKind.DivisionByZero)]
+    [InlineData("1/floor(0.5)", CalcErrorKind.DivisionByZero)]
+    [InlineData("1/log2(1)", CalcErrorKind.DivisionByZero)]
+    [InlineData("log2(1/0)", CalcErrorKind.DivisionByZero)]
+    [InlineData("log2(foo)", CalcErrorKind.UnknownIdentifier)]
+    [InlineData("Log2(8)", CalcErrorKind.UnknownIdentifier)]
+    [InlineData("LOG2(8)", CalcErrorKind.UnknownIdentifier)]
+    [InlineData("log(2", CalcErrorKind.UnbalancedParentheses)]
+    [InlineData("log 2", CalcErrorKind.UnexpectedToken)]
+    [InlineData("5%floor(0.5)", CalcErrorKind.DivisionByZero)]
+    [InlineData("sqrt(foo)", CalcErrorKind.UnknownIdentifier)]
+    [InlineData("foo(2)", CalcErrorKind.UnknownIdentifier)]
+    [InlineData("1/0+foo(2)", CalcErrorKind.UnknownIdentifier)]
+    [InlineData("sqrt(4)(2)", CalcErrorKind.UnexpectedToken)]
+    public void Evaluate_ErrorsAroundFunctions(string input, CalcErrorKind expected)
+    {
+        var ex = Assert.Throws<CalcException>(() => EvalSource(input));
+
+        Assert.Equal(expected, ex.Kind);
+    }
+
+    [Fact]
+    public void Evaluate_Log2OfInfinity_GivesInfinity()
+    {
+        // 10^400 overflows to infinity, and log2(infinity) is infinity: overflow is not an error
+        Assert.True(double.IsPositiveInfinity(EvalSource("log2(10^400)")));
+    }
+
+    [Fact]
+    public void Evaluate_Log2OfAPowerOfTwoIsExact()
+    {
+        for (var exponent = -20; exponent <= 20; exponent++)
+        {
+            Assert.Equal(exponent, EvalSource($"log2(2^({exponent}))"), Precision);
+        }
+    }
+
+    [Fact]
+    public void Evaluate_Log2MatchesMathLog2()
+    {
+        Assert.Equal(Math.Log2(1000), EvalSource("log2(1000)"));
+    }
+
+    [Fact]
+    public void Evaluate_ExpOverflow_GivesInfinity()
+    {
+        Assert.True(double.IsPositiveInfinity(EvalSource("exp(1000)")));
+    }
+
+    [Fact]
+    public void Evaluate_ExpUnderflow_GivesZero()
+    {
+        Assert.Equal(0, EvalSource("exp(0-1000)"));
+    }
+
+    [Fact]
+    public void Evaluate_NegativeBaseWithFunctionExponent()
+    {
+        // (-8)^(1/3) written with a function: (-8)^(1/abs(3)) is still the real cube root
+        Assert.Equal(-2, EvalSource("(-8)^(1/abs(3))"), Precision);
+    }
+
+    [Fact]
+    public void Evaluate_DeeplyNestedCalls_AtTheLimit()
+    {
+        var input = string.Concat(Enumerable.Repeat("abs(", TestConstants.MaxDepthLimit)) + "5" + new string(')', TestConstants.MaxDepthLimit);
+
+        Assert.Equal(5, EvalSource(input));
     }
 
     [Fact]

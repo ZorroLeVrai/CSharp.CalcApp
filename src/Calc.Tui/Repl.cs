@@ -11,6 +11,7 @@ internal static class Repl
     private const string HelpText = @"Type an expression and press Enter, for example (2+3)*4.
 Operators: + - * / % ^ and parentheses ( ).
 Constants: pi, e.
+Functions (angles in radians): sqrt, abs, exp, ln, log, log2, sin, cos, tan, asin, acos, atan, floor, ceil, round.
 Commands: help (show this help), exit or quit (leave).";
 
     public static void Run(TextReader input, TextWriter output)

@@ -20,7 +20,9 @@ The solution contains four projects:
 - Results rounded to 12 significant digits; overflow prints `inf`
 - Simple REPL: type an expression, press Enter; `help` shows a short help text; `exit` or `quit` leaves
 
-Not planned: implicit multiplication (`2pi`), scientific notation (`1e5`), variables, functions with several arguments.
+Scientific notation is supported, where `2.5e5` is `2.5*10^5`. The `e` must directly follow a number, so the constant `e` keeps working (`2*e`, `e^2`).
+
+Not planned: implicit multiplication (`2pi`), variables, functions with several arguments.
 
 ## Usage
 
@@ -57,4 +59,4 @@ dotnet format               # format
 
 ## Status
 
-All planned stages are done (stages 1 to 14 of [implementation-plan.md](implementation-plan.md)): the calculator library (tokenizer, parser, evaluator) and the REPL are implemented and tested. Variables (stage 15) are out of scope.
+Stages 1 to 15 of [implementation-plan.md](implementation-plan.md) are done: the calculator library (tokenizer, parser, evaluator) and the REPL are implemented and tested. Variables are out of scope (a future stage).

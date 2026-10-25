@@ -10,6 +10,7 @@ internal static class Repl
 
     private const string HelpText = @"Type an expression and press Enter, for example (2+3)*4.
 Operators: + - * / % ^ and parentheses ( ).
+Numbers: 1.5, 2.5e3 (scientific notation).
 Constants: pi, e.
 Functions (angles in radians): sqrt, abs, exp, ln, log, log2, sin, cos, tan, asin, acos, atan, floor, ceil, round.
 Commands: help (show this help), exit or quit (leave).";
@@ -77,6 +78,7 @@ Commands: help (show this help), exit or quit (leave).";
             return "-inf";
         }
 
-        return value == 0 ? "0" : value.ToString(ResultFormat, CultureInfo.InvariantCulture);
+        // Lowercase 'e', the only form the calculator reads, so a printed result can be typed back in.
+        return value == 0 ? "0" : value.ToString(ResultFormat, CultureInfo.InvariantCulture).Replace('E', 'e');
     }
 }

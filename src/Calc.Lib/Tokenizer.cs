@@ -25,6 +25,27 @@ internal static class Tokenizer
                     charIndex++;
                 }
 
+                if (charIndex < input.Length && input[charIndex] == 'e')
+                {
+                    charIndex++;
+                    if (charIndex < input.Length && input[charIndex] is '+' or '-')
+                    {
+                        charIndex++;
+                    }
+
+                    var exponentStart = charIndex;
+                    while (charIndex < input.Length && IsNumberChar(input[charIndex]))
+                    {
+                        charIndex++;
+                    }
+
+                    var exponent = input[exponentStart..charIndex];
+                    if (exponent.Length == 0 || !exponent.All(char.IsAsciiDigit))
+                    {
+                        throw new CalcException(CalcErrorKind.InvalidNumber, input[start..charIndex]);
+                    }
+                }
+
                 tokens.Add(new NumberToken(ParseNumber(input[start..charIndex])));
             }
             else if (char.IsAsciiLetter(c))
@@ -66,7 +87,7 @@ internal static class Tokenizer
 
     private static double ParseNumber(string text)
     {
-        if (!double.TryParse(text, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var value))
+        if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
         {
             throw new CalcException(CalcErrorKind.InvalidNumber, text);
         }

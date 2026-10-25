@@ -157,13 +157,98 @@ public class TokenizerTests
     [Fact]
     public void Tokenize_NumberFollowedByLetters_GivesANumberThenAnIdentifier()
     {
-        // 2pi and 1e5: no implicit multiplication and no scientific notation, the parser reports them
+        // 2pi, 2 e5 and 2E5: no implicit multiplication, the parser reports them
         Assert.Equal(
             new Token[] { new NumberToken(2), new IdentifierToken("pi") },
             Tokenizer.Tokenize("2pi"));
         Assert.Equal(
-            new Token[] { new NumberToken(1), new IdentifierToken("e5") },
-            Tokenizer.Tokenize("1e5"));
+            new Token[] { new NumberToken(2), new IdentifierToken("e5") },
+            Tokenizer.Tokenize("2 e5"));
+        Assert.Equal(
+            new Token[] { new NumberToken(2), new IdentifierToken("E5") },
+            Tokenizer.Tokenize("2E5"));
+    }
+
+    [Theory]
+    [InlineData("2.5e5", 250000.0)]
+    [InlineData("2e5", 200000.0)]
+    [InlineData("2.5e-3", 0.0025)]
+    [InlineData("2.5e+3", 2500.0)]
+    [InlineData(".5e3", 500.0)]
+    [InlineData("007e2", 700.0)]
+    [InlineData("2e0", 2.0)]
+    [InlineData("0e5", 0.0)]
+    [InlineData("1e-0", 1.0)]
+    [InlineData("2e007", 2e7)]
+    [InlineData("1.1e-5", 1.1e-5)]
+    [InlineData("123456789e-9", 123456789e-9)]
+    public void Tokenize_ScientificNotation_IsOneNumberToken(string input, double expected)
+    {
+        Assert.Equal(new Token[] { new NumberToken(expected) }, Tokenizer.Tokenize(input));
+    }
+
+    [Fact]
+    public void Tokenize_ScientificNotation_InContext()
+    {
+        Assert.Equal(
+            new Token[] { new NumberToken(1e3), new OperatorToken(Operator.Add), new NumberToken(1e-3) },
+            Tokenizer.Tokenize("1e3+1e-3"));
+        Assert.Equal(
+            new Token[] { new NumberToken(2.5e5), new OperatorToken(Operator.Add), new NumberToken(1) },
+            Tokenizer.Tokenize(" 2.5e5 + 1 "));
+        Assert.Equal(
+            new Token[] { new LeftParenToken(), new NumberToken(2e3), new RightParenToken() },
+            Tokenizer.Tokenize("(2e3)"));
+    }
+
+    [Fact]
+    public void Tokenize_TheConstantEIsUntouched()
+    {
+        Assert.Equal(new Token[] { new IdentifierToken("e") }, Tokenizer.Tokenize("e"));
+        Assert.Equal(new Token[] { new IdentifierToken("e5") }, Tokenizer.Tokenize("e5"));
+        Assert.Equal(new Token[] { new IdentifierToken("x1e5") }, Tokenizer.Tokenize("x1e5"));
+        Assert.Equal(
+            new Token[] { new IdentifierToken("e"), new OperatorToken(Operator.Add), new NumberToken(5) },
+            Tokenizer.Tokenize("e+5"));
+        Assert.Equal(
+            new Token[] { new NumberToken(2), new OperatorToken(Operator.Mul), new IdentifierToken("e") },
+            Tokenizer.Tokenize("2*e"));
+    }
+
+    [Theory]
+    [InlineData("2e", "2e")]
+    [InlineData("2e+", "2e+")]
+    [InlineData("2e-", "2e-")]
+    [InlineData("2e*3", "2e")]
+    [InlineData("2ee5", "2e")]
+    [InlineData("2exp(1)", "2e")]
+    [InlineData("2e1.5", "2e1.5")]
+    [InlineData("2e.5", "2e.5")]
+    [InlineData("2e5.", "2e5.")]
+    [InlineData("2e+-5", "2e+")]
+    [InlineData("2e--5", "2e-")]
+    [InlineData("1.2.3e4", "1.2.3e4")]
+    public void Tokenize_MalformedScientificNotation_IsInvalidNumber(string input, string literal)
+    {
+        var ex = Assert.Throws<CalcException>(() => Tokenizer.Tokenize(input));
+
+        Assert.Equal(CalcErrorKind.InvalidNumber, ex.Kind);
+        Assert.Contains($"'{literal}'", ex.Message);
+    }
+
+    [Fact]
+    public void Tokenize_ScientificNotation_OverflowAndUnderflow()
+    {
+        Assert.Equal(new Token[] { new NumberToken(double.PositiveInfinity) }, Tokenizer.Tokenize("1e400"));
+        Assert.Equal(new Token[] { new NumberToken(0) }, Tokenizer.Tokenize("1e-400"));
+    }
+
+    [Fact]
+    public void Tokenize_HugeExponent_OnlyThrowsCalcException()
+    {
+        var exception = Record.Exception(() => Tokenizer.Tokenize("1e" + new string('9', 10_000)));
+
+        Assert.True(exception is null or CalcException);
     }
 
     [Fact]

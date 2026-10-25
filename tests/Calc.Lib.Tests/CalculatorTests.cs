@@ -101,6 +101,44 @@ public class CalculatorTests
         Assert.Equal(expected, Calculator.Evaluate(input), Precision);
     }
 
+    [Theory]
+    [InlineData("2.5e5", 250000)]
+    [InlineData("1e3+1", 1001)]
+    [InlineData("-2e3", -2000)]
+    [InlineData("2e-3*1000", 2)]
+    [InlineData("1e3^2", 1000000)]
+    [InlineData("2^1e1", 1024)]
+    [InlineData("sqrt(1e4)", 100)]
+    [InlineData("1e2%7", 2)]
+    [InlineData("1e3*e", 1000 * Math.E)]
+    [InlineData("e^2", Math.E * Math.E)]
+    public void Evaluate_ScientificNotation(string input, double expected)
+    {
+        Assert.Equal(expected, Calculator.Evaluate(input), Precision);
+    }
+
+    [Fact]
+    public void Evaluate_ScientificNotation_OverflowAndUnderflow()
+    {
+        Assert.Equal(double.PositiveInfinity, Calculator.Evaluate("1e400"));
+        Assert.Equal(0, Calculator.Evaluate("1e-400"));
+        Assert.Equal(CalcErrorKind.DivisionByZero, Assert.Throws<CalcException>(() => Calculator.Evaluate("1/1e-400")).Kind);
+        Assert.Equal(CalcErrorKind.DomainError, Assert.Throws<CalcException>(() => Calculator.Evaluate("0*1e400")).Kind);
+    }
+
+    [Theory]
+    [InlineData("2e")]
+    [InlineData("2e+")]
+    [InlineData("2exp(1)")]
+    [InlineData("2e1.5")]
+    [InlineData("1.2.3e4")]
+    public void Evaluate_MalformedScientificNotation_IsInvalidNumber(string input)
+    {
+        var ex = Assert.Throws<CalcException>(() => Calculator.Evaluate(input));
+
+        Assert.Equal(CalcErrorKind.InvalidNumber, ex.Kind);
+    }
+
     [Fact]
     public void Evaluate_PiIsApproximately3Point14159()
     {
@@ -128,7 +166,9 @@ public class CalculatorTests
     [InlineData("2pi", CalcErrorKind.UnexpectedToken)]
     [InlineData("pi pi", CalcErrorKind.UnexpectedToken)]
     [InlineData("pi e", CalcErrorKind.UnexpectedToken)]
-    [InlineData("1e5", CalcErrorKind.UnexpectedToken)]
+    [InlineData("2 e5", CalcErrorKind.UnexpectedToken)]
+    [InlineData("2E5", CalcErrorKind.UnexpectedToken)]
+    [InlineData("2e5x", CalcErrorKind.UnexpectedToken)]
     [InlineData("pi+", CalcErrorKind.UnexpectedEnd)]
     [InlineData("pi(2)", CalcErrorKind.UnexpectedToken)]
     [InlineData("pi$", CalcErrorKind.UnexpectedCharacter)]

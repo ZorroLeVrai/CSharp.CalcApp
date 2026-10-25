@@ -2,7 +2,7 @@
 
 ## Project overview
 
-> **Status: implemented.** All planned stages (1 to 14 in [implementation-plan.md](implementation-plan.md)) are done: the library, the REPL and their tests. Stage 15 (variables) is out of scope.
+> **Status: implemented.** Stages 1 to 15 in [implementation-plan.md](implementation-plan.md) are done: the library, the REPL and their tests. Variables are a future stage, out of scope.
 >
 > Shared build settings (net10.0, C# 14, nullable, warnings as errors) are in `Directory.Build.props`. `nuget.config` pins nuget.org as the package source. Test projects see internals through `InternalsVisibleTo`.
 
@@ -58,6 +58,7 @@ CSharp.calc/
   - Functions: `sqrt`, `sin`, `cos`, `tan`, etc.
   - Constants: `pi`, `e`
 - Whitespace is ignored. Decimal numbers (`1.5`) are accepted. Parse and format numbers with the invariant culture.
+- Scientific notation (stage 15): `2.5e5` = `2.5*10^5`. The `e` directly follows a number and is followed by an integer exponent with an optional sign; any other `e` is the constant. Implicit multiplication stays unsupported.
 - Errors are reported as a typed `CalcException` carrying an error kind (invalid token, unbalanced parentheses, division by zero, unknown function/constant, etc.). The library must never throw anything other than `CalcException` on user input.
 - The library does no I/O (no `Console`, no files). Keep it pure and easy to unit-test.
 - Suggested internals: tokenizer -> parser (recursive descent or Pratt) -> AST -> evaluator.

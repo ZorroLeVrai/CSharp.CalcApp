@@ -246,7 +246,7 @@ Each item follows the same two steps: tokenizer tests then code, parser tests th
    - Add `IdentifierToken`, `ConstantExpr` (or a name lookup using `Math.PI` and `Math.E`) and the error kind.
    - An identifier is an ASCII letter followed by ASCII letters or digits (`pi`, `x1`); anything else (`_`, `é`) is still an `UnexpectedCharacter`. The tokenizer does not judge names: `PI` is a valid identifier token.
    - Names are resolved by the parser through a `Constants` table (`pi`, `e`; lowercase and case-sensitive) into `ConstantExpr(Name, Value)`. An unknown name throws `CalcErrorKind.UnknownIdentifier` (message `Unknown name 'foo'`) while parsing, so it is reported before anything is evaluated: `1/0+foo` is an unknown name, not a division by zero.
-   - No implicit multiplication and no scientific notation: `2pi`, `pi pi` and `1e5` (tokens `1`, `e5`) are `UnexpectedToken`.
+   - No implicit multiplication: `2pi` and `pi pi` are `UnexpectedToken`. Scientific notation was not supported at this point either: `1e5` (tokens `1`, `e5`) was `UnexpectedToken`; [Stage 15](#stage-15-scientific-notation) adds it and changes that result.
    - Add the constants to the REPL's `help` text (and to its test).
 
 ### Stage 14: Functions
@@ -263,9 +263,44 @@ Each item follows the same two steps: tokenizer tests then code, parser tests th
    - A call counts as one level of nesting and one level of tree height, like a negation or a group (1024 nested calls work, 1025 give `ExpressionTooDeep`).
    - Add the functions to the REPL's `help` text (and to its test).
 
-### Stage 15: Variables (future, not part of the current scope)
+### Stage 15: Scientific notation
 
-The tree design allows evaluating one parsed expression many times with different values. This would add an environment (`IReadOnlyDictionary<string, double>`) passed to `Evaluate`. It is listed in [project-scope.md](project-scope.md) as out of scope, so do not start it without updating the scope first.
+A number can carry a power of ten: `2.5e5` is `2.5*10^5`, that is `250000`. This only changes how a number is read, so the work is in the tokenizer: the whole literal becomes one `NumberToken`, and the parser, the evaluator and the depth limit are untouched.
+
+**Syntax**
+
+- Form: `<mantissa>e<exponent>`. The mantissa is a decimal number as already accepted (`2`, `2.5`, `.5`, `007`). The exponent is a whole number: an optional sign (`+` or `-`) followed by ASCII digits, with no decimal point (`2.5e5`, `2.5e-3`, `2.5e+3`, `2e0`, `2e007`).
+- No whitespace inside the literal: `2.5e5` is one number, `2.5 e5` is not (it stays the number `2.5` followed by the name `e5`, an `UnexpectedToken`).
+- **How the constant `e` is told apart:** an `e` that directly follows a number is the exponent marker; every other `e` is unchanged (the constant `e`, or part of a name: `e`, `2*e`, `e^2`, `e+5`, `e5`, `x1e5`). So the rule is "in scientific notation the `e` is always preceded by a number", and then it must be followed by an integer exponent.
+- Lowercase only, like every name: `2E5` is still the number `2` followed by the name `E5` (`UnexpectedToken`).
+- The value is what `double.Parse` gives for the literal text, which is correctly rounded: `1.1e-5` is exactly the C# literal `1.1e-5` (computing `1.1 * Math.Pow(10, -5)` would not always be). Use `NumberStyles.Float` with the invariant culture, after the tokenizer has checked the shape of the literal itself.
+- Overflow and underflow follow the existing rules: `1e400` is infinity (like `10^400`, printed as `inf`), `1e-400` is `0`. An exponent with very many digits (`1e99999999999999999999`) must not throw anything but `CalcException`; to be confirmed by a test (infinity or `0` is expected; if .NET rejects it, report `InvalidNumber`).
+- It is an ordinary number afterwards: `-2e3` is `-(2e3)`, `2e3^2` is `(2e3)^2`, `2^1e1` is `1024`, `sqrt(1e4)` is `100`.
+
+**Errors** (all `InvalidNumber`, and the message names the literal as scanned, e.g. `Invalid number '2e'`)
+
+- `e` right after a number without an exponent: `2e`, `2e+`, `2e-`, `2e*3`, `2ee5`, and also `2exp(1)` (the `e` after the `2` is taken as an exponent marker).
+- A non-integer or malformed exponent: `2e1.5`, `2e.5`, `2e5.`, `2e+-5`, `2e--5`.
+- A malformed mantissa: `1.2.3e4`.
+- Still `UnexpectedToken`, from the parser, because a number is directly followed by a name (no implicit multiplication): `2e5x`, `2e5e5`, `2e5pi`; and with whitespace, `2 e5`, `2 e`.
+
+1. **Tests**
+   - Tokenizer, valid literals (`[Theory]`, compare with the C# literal): `2.5e5` -> `250000`, `2e5`, `2.5e-3` -> `0.0025`, `2.5e+3` -> `2500`, `.5e3` -> `500`, `007e2` -> `700`, `2e0` -> `2`, `0e5` -> `0`, `1e-0`, `2e007`, `1.1e-5` (exactly equal to the C# literal), `123456789e-9`; each one is a single `NumberToken`.
+   - Tokenizer, in context: `1e3+1e-3`, `2*3e2`, `(2e3)`, `2.5e5 + 1` and whitespace around the literal; `e` and `pi` untouched: `e`, `e5`, `e+5` (name, `+`, number), `2*e`, `x1e5` (one name), `2 e5` and `2E5` (number then name).
+   - Tokenizer, errors: every case of the `InvalidNumber` list above, with the literal in the message; `1e400` -> infinity and `1e-400` -> `0` without an exception; a 10,000-digit exponent does not throw anything but `CalcException`.
+   - Evaluator and `Calculator.Evaluate`: `2.5e5` -> `250000`; `2.5e5` equals `2.5*10^5`; `1e3+1` -> `1001`; `-2e3` -> `-2000`; `2e-3*1000` -> `2`; `1e3^2` -> `1000000`; `2^1e1` -> `1024`; `sqrt(1e4)` -> `100`; `1e2%7` -> `2`; the constant still works next to it: `1e3*e`, `e^2`, `2*e`; `1e400` -> infinity; `1/1e-400` -> `DivisionByZero`; `0*1e400` -> `DomainError` (zero times infinity); errors from the list above through `Calculator.Evaluate`.
+   - Parser: no new tests are needed (a scientific literal is a `NumberToken`), but one end-to-end test checks that `2e5x` and `2 e5` are `UnexpectedToken`.
+   - REPL: `2.5e5` prints `250000`; `1e3+1e-3` prints `1000.001`; an error such as `2e` prints `Error: Invalid number '2e'` and the loop continues; `help` mentions scientific notation.
+   - Existing tests to change, because `1e5` is now a valid number: the `1e5` case in `Tokenize_NumberFollowedByLetters_GivesANumberThenAnIdentifier` (tokenizer tests), the `1e5` case in `Evaluate_ImplicitMultiplicationIsNotSupported` (evaluator tests) and the `1e5` case in `Evaluate_ConstantErrors` (calculator tests). Keep the intent with `2 e5`, `2E5` and `2pi`.
+2. **Implementation**
+   - In the tokenizer's number branch: read the run of digits and dots; if the next character is `e`, read the exponent (one optional sign, then the run of digits and dots), validate that the exponent is a non-empty run of digits, then parse the whole text with `double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, ...)`. Report `InvalidNumber` with the literal otherwise. A number without `e` keeps going through the existing path.
+   - Add a line to the REPL's `help` text, for example `Numbers: 1.5, 2.5e3 (scientific notation)` (and to its test); keep `help` short.
+   - **REPL output (small follow-up, easy to drop):** results are formatted with `"G12"`, which prints large and small values with an uppercase `E` (`1.12589990684E+15`, `1.22464679915E-16`), and the calculator only reads a lowercase `e`. Print the lowercase form (`1.12589990684e+15`) so that a printed result can be typed back in as input. Tests: `2^50` and `sin(pi)` print with a lowercase `e`, and the printed text evaluates back to the same value (to 12 digits).
+   - Update the documentation together (see the working rules): `README.md` (features, "Not planned" line), `project-scope.md` (in scope), `CLAUDE.md` (syntax, status) and tick the stage in the checklist below.
+
+### Future stage: Variables (not part of the current scope)
+
+The tree design allows evaluating one parsed expression many times with different values. This would add an environment (`IReadOnlyDictionary<string, double>`) passed to `Evaluate`. It is listed in [project-scope.md](project-scope.md) as out of scope, so do not start it without updating the scope first. It has no stage number yet.
 
 ---
 
@@ -293,3 +328,4 @@ The tree design allows evaluating one parsed expression many times with differen
 - [x] Stage 12: Modulo
 - [x] Stage 13: Constants
 - [x] Stage 14: Functions
+- [x] Stage 15: Scientific notation

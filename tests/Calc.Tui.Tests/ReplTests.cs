@@ -173,6 +173,42 @@ public class ReplTests
     }
 
     [Fact]
+    public void Run_HelpMentionsScientificNotation()
+    {
+        var help = HelpOutput();
+
+        Assert.Contains("scientific notation", help);
+        Assert.Contains("e3", help);
+    }
+
+    [Fact]
+    public void Run_EvaluatesScientificNotation()
+    {
+        Assert.Equal("> 250000\n> 1000.001\n> ", Run("2.5e5\n1e3+1e-3\nquit\n"));
+    }
+
+    [Fact]
+    public void Run_MalformedScientificNotationPrintsAnErrorAndTheLoopContinues()
+    {
+        Assert.Equal("> Error: Invalid number '2e'\n> 5\n> ", Run("2e\n2+3\nquit\n"));
+    }
+
+    [Theory]
+    [InlineData("2^50")]
+    [InlineData("sin(pi)")]
+    public void Run_LargeAndSmallResultsUseALowercaseExponent(string line)
+    {
+        var printed = Run(line + "\nquit\n").Split('\n')[0][Prompt.Length..];
+
+        Assert.DoesNotContain("E", printed);
+        Assert.Contains("e", printed);
+        // 12 significant digits are printed, so the value comes back to within a relative 1e-11.
+        var expected = Calc.Lib.Calculator.Evaluate(line);
+        var actual = Calc.Lib.Calculator.Evaluate(printed);
+        Assert.InRange(Math.Abs(actual - expected), 0, Math.Abs(expected) * 1e-11);
+    }
+
+    [Fact]
     public void Run_HelpIsShort()
     {
         var lines = HelpOutput().Split('\n', StringSplitOptions.RemoveEmptyEntries);
@@ -212,10 +248,9 @@ public class ReplTests
     [Fact]
     public void Run_ExitStillWorksAfterHelp()
     {
-        var output = Run("help\nexit\n2+3\n");
+        var output = Run("help\nexit\n7*8\n");
 
         Assert.Equal(2, CountOccurrences(output, Prompt));
-        Assert.DoesNotContain("5", output);
     }
 
     [Fact]

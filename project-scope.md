@@ -14,6 +14,7 @@ Build a C# application on .NET 10 that evaluates text arithmetic expressions. Gi
 - Functions: `sqrt`, `sin`, `cos`, `tan`, and similar
 - Constants: `pi`, `e`
 - Decimal numbers and whitespace-insensitive input
+- Scientific notation for numbers (stage 15): `2.5e5` is `2.5*10^5`; the exponent is an integer with an optional sign, and the `e` must directly follow the number, so the constant `e` is not affected
 - Clear, typed errors (`CalcException` with an error kind): invalid token, unbalanced parentheses, division by zero, unknown function or constant
 - xUnit tests (in `Calc.Lib.Tests`) covering precedence, associativity, unary minus, functions and every error case
 

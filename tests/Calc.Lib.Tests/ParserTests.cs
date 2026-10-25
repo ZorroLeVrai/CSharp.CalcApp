@@ -83,6 +83,128 @@ public class ParserTests
         Assert.Equal(CalcErrorKind.UnexpectedToken, ex.Kind);
     }
 
+    private static BinaryExpr B(Operator op, Expr left, Expr right) => new(op, left, right);
+
+    [Fact]
+    public void Parse_MultiplicationBindsTighterThanAddition_OnTheRight()
+    {
+        // 2+3*4
+        var expr = Parser.Parse([Num(2), Op(Operator.Add), Num(3), Op(Operator.Mul), Num(4)]);
+
+        Assert.Equal(B(Operator.Add, N(2), B(Operator.Mul, N(3), N(4))), expr);
+    }
+
+    [Fact]
+    public void Parse_MultiplicationBindsTighterThanAddition_OnTheLeft()
+    {
+        // 2*3+4
+        var expr = Parser.Parse([Num(2), Op(Operator.Mul), Num(3), Op(Operator.Add), Num(4)]);
+
+        Assert.Equal(B(Operator.Add, B(Operator.Mul, N(2), N(3)), N(4)), expr);
+    }
+
+    [Fact]
+    public void Parse_DivisionBindsTighterThanSubtraction()
+    {
+        // 10-6/3
+        var expr = Parser.Parse([Num(10), Op(Operator.Sub), Num(6), Op(Operator.Div), Num(3)]);
+
+        Assert.Equal(B(Operator.Sub, N(10), B(Operator.Div, N(6), N(3))), expr);
+    }
+
+    [Fact]
+    public void Parse_SubtractionIsLeftAssociative()
+    {
+        // 8-3-2
+        var expr = Parser.Parse([Num(8), Op(Operator.Sub), Num(3), Op(Operator.Sub), Num(2)]);
+
+        Assert.Equal(B(Operator.Sub, B(Operator.Sub, N(8), N(3)), N(2)), expr);
+    }
+
+    [Fact]
+    public void Parse_DivisionIsLeftAssociative()
+    {
+        // 16/4/2
+        var expr = Parser.Parse([Num(16), Op(Operator.Div), Num(4), Op(Operator.Div), Num(2)]);
+
+        Assert.Equal(B(Operator.Div, B(Operator.Div, N(16), N(4)), N(2)), expr);
+    }
+
+    [Fact]
+    public void Parse_AdditionAndSubtractionShareALevel_LeftToRight()
+    {
+        // 1-2+3
+        var expr = Parser.Parse([Num(1), Op(Operator.Sub), Num(2), Op(Operator.Add), Num(3)]);
+
+        Assert.Equal(B(Operator.Add, B(Operator.Sub, N(1), N(2)), N(3)), expr);
+    }
+
+    [Fact]
+    public void Parse_MultiplicationAndDivisionShareALevel_LeftToRight()
+    {
+        // 2*6/3
+        var expr = Parser.Parse([Num(2), Op(Operator.Mul), Num(6), Op(Operator.Div), Num(3)]);
+
+        Assert.Equal(B(Operator.Div, B(Operator.Mul, N(2), N(6)), N(3)), expr);
+    }
+
+    [Fact]
+    public void Parse_PowerIsRightAssociative()
+    {
+        // 2^3^2
+        var expr = Parser.Parse([Num(2), Op(Operator.Pow), Num(3), Op(Operator.Pow), Num(2)]);
+
+        Assert.Equal(B(Operator.Pow, N(2), B(Operator.Pow, N(3), N(2))), expr);
+    }
+
+    [Fact]
+    public void Parse_PowerBindsTighterThanMultiplication_OnTheRight()
+    {
+        // 2*3^2
+        var expr = Parser.Parse([Num(2), Op(Operator.Mul), Num(3), Op(Operator.Pow), Num(2)]);
+
+        Assert.Equal(B(Operator.Mul, N(2), B(Operator.Pow, N(3), N(2))), expr);
+    }
+
+    [Fact]
+    public void Parse_PowerBindsTighterThanMultiplication_OnTheLeft()
+    {
+        // 2^3*4
+        var expr = Parser.Parse([Num(2), Op(Operator.Pow), Num(3), Op(Operator.Mul), Num(4)]);
+
+        Assert.Equal(B(Operator.Mul, B(Operator.Pow, N(2), N(3)), N(4)), expr);
+    }
+
+    [Fact]
+    public void Parse_AllLevelsTogether()
+    {
+        // 1+2*3^4^5-6
+        var expr = Parser.Parse(
+        [
+            Num(1), Op(Operator.Add), Num(2), Op(Operator.Mul), Num(3), Op(Operator.Pow),
+            Num(4), Op(Operator.Pow), Num(5), Op(Operator.Sub), Num(6),
+        ]);
+
+        var expected = B(
+            Operator.Sub,
+            B(
+                Operator.Add,
+                N(1),
+                B(Operator.Mul, N(2), B(Operator.Pow, N(3), B(Operator.Pow, N(4), N(5))))),
+            N(6));
+        Assert.Equal(expected, expr);
+    }
+
+    [Fact]
+    public void Parse_TrailingOperatorAfterHigherPrecedence_Throws()
+    {
+        // 2+3*
+        var ex = Assert.Throws<CalcException>(
+            () => Parser.Parse([Num(2), Op(Operator.Add), Num(3), Op(Operator.Mul)]));
+
+        Assert.Equal(CalcErrorKind.UnexpectedEnd, ex.Kind);
+    }
+
     [Theory]
     [InlineData(Operator.Add)]
     [InlineData(Operator.Sub)]

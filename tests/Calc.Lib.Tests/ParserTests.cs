@@ -286,14 +286,9 @@ public class ParserTests
     [Fact]
     public void Parse_ModeratelyDeepNesting_Works()
     {
-        var tokens = new List<Token>();
-        tokens.AddRange(Enumerable.Repeat<Token>(LParen(), 50));
-        tokens.Add(Num(7));
-        tokens.AddRange(Enumerable.Repeat<Token>(RParen(), 50));
+        var expr = Parser.Parse(NestedParentheses(50));
 
-        var expr = Parser.Parse(tokens);
-
-        Assert.Equal(N(7), expr);
+        Assert.Equal(N(0), expr);
     }
 
     [Fact]
@@ -445,6 +440,112 @@ public class ParserTests
         var expr = Parser.Parse(Tokenizer.Tokenize(input));
 
         Assert.Equal(1025, CountNumbers(expr));
+    }
+
+    [Theory]
+    [InlineData(Operator.Add)]
+    [InlineData(Operator.Sub)]
+    [InlineData(Operator.Mul)]
+    [InlineData(Operator.Div)]
+    [InlineData(Operator.Pow)]
+    public void Parse_ChainOf1025Operators_IsTooDeep(Operator op)
+    {
+        var ex = Assert.Throws<CalcException>(() => Parser.Parse(LongChain(1025, _ => op)));
+
+        Assert.Equal(CalcErrorKind.ExpressionTooDeep, ex.Kind);
+    }
+
+    [Theory]
+    [InlineData(Operator.Add)]
+    [InlineData(Operator.Pow)]
+    public void Parse_MillionOperatorChain_IsRejectedWithoutOverflowingTheStack(Operator op)
+    {
+        var ex = Assert.Throws<CalcException>(() => Parser.Parse(LongChain(1_000_000, _ => op)));
+
+        Assert.Equal(CalcErrorKind.ExpressionTooDeep, ex.Kind);
+    }
+
+    [Fact]
+    public void Parse_ParenthesesNestedUpToTheLimit_Work()
+    {
+        var expr = Parser.Parse(NestedParentheses(1024));
+
+        Assert.Equal(N(0), expr);
+    }
+
+    [Fact]
+    public void Parse_ParenthesesNestedBeyondTheLimit_AreTooDeep()
+    {
+        var ex = Assert.Throws<CalcException>(() => Parser.Parse(NestedParentheses(1025)));
+
+        Assert.Equal(CalcErrorKind.ExpressionTooDeep, ex.Kind);
+    }
+
+    [Fact]
+    public void Parse_HugeParenthesisNesting_IsRejectedWithoutOverflowingTheStack()
+    {
+        var ex = Assert.Throws<CalcException>(() => Parser.Parse(NestedParentheses(200_000)));
+
+        Assert.Equal(CalcErrorKind.ExpressionTooDeep, ex.Kind);
+    }
+
+    [Fact]
+    public void Parse_HugeRunOfOpeningParentheses_IsTooDeepNotUnbalanced()
+    {
+        var tokens = Enumerable.Repeat<Token>(LParen(), 200_000).ToList();
+
+        var ex = Assert.Throws<CalcException>(() => Parser.Parse(tokens));
+
+        Assert.Equal(CalcErrorKind.ExpressionTooDeep, ex.Kind);
+    }
+
+    [Fact]
+    public void Parse_LongChainOfShallowGroups_IsTooDeepBecauseTheChainIsTall()
+    {
+        // (1+1)*(1+1)*...: each group is shallow, but 1999 chained operators make the tree 1999 levels tall
+        var tokens = new List<Token>();
+        for (var i = 0; i < 2000; i++)
+        {
+            if (i > 0)
+            {
+                tokens.Add(Op(Operator.Mul));
+            }
+
+            tokens.AddRange([LParen(), Num(1), Op(Operator.Add), Num(1), RParen()]);
+        }
+
+        var ex = Assert.Throws<CalcException>(() => Parser.Parse(tokens));
+
+        Assert.Equal(CalcErrorKind.ExpressionTooDeep, ex.Kind);
+    }
+
+    [Fact]
+    public void Parse_ManyShallowGroupsInsideTheLimit_Work()
+    {
+        // 500 groups chained with one operator: tree height 500 + 1
+        var tokens = new List<Token>();
+        for (var i = 0; i < 500; i++)
+        {
+            if (i > 0)
+            {
+                tokens.Add(Op(Operator.Mul));
+            }
+
+            tokens.AddRange([LParen(), Num(1), Op(Operator.Add), Num(1), RParen()]);
+        }
+
+        var expr = Parser.Parse(tokens);
+
+        Assert.Equal(1000, CountNumbers(expr));
+    }
+
+    private static List<Token> NestedParentheses(int depth, double num = 0)
+    {
+        var tokens = new List<Token>();
+        tokens.AddRange(Enumerable.Repeat<Token>(LParen(), depth));
+        tokens.Add(Num(num));
+        tokens.AddRange(Enumerable.Repeat<Token>(RParen(), depth));
+        return tokens;
     }
 
     private static List<Token> LongChain(int operatorCount, Func<int, Operator> operatorAt)

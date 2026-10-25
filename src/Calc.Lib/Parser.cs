@@ -2,8 +2,14 @@ namespace Calc.Lib;
 
 internal sealed class Parser
 {
+    // Both the parser (nested parentheses, right-associative chains) and the evaluator (one call per
+    // tree level) recurse once per level. A StackOverflowException cannot be caught in .NET, so deeper
+    // input is rejected up front. 1024 levels fit comfortably in the default stack.
+    internal const int MaxDepth = 1024;
+
     private readonly IReadOnlyList<Token> _tokens;
     private int _position;
+    private int _nesting;
 
     private Parser(IReadOnlyList<Token> tokens)
     {
@@ -13,7 +19,7 @@ internal sealed class Parser
     public static Expr Parse(IReadOnlyList<Token> tokens)
     {
         var parser = new Parser(tokens);
-        var expr = parser.ParseExpression(0);
+        var (expr, _) = parser.ParseExpression(0);
 
         if (parser._position < tokens.Count)
         {
@@ -28,12 +34,13 @@ internal sealed class Parser
 
     // Precedence climbing: keep consuming operators whose precedence is at least minPrecedence.
     // A left-associative operator parses its right side one level higher, so an equal operator
-    // ends it and the loop continues left to right (shallow tree walk for long chains).
+    // ends it and the loop continues left to right (no recursion for long chains).
     // A right-associative operator parses its right side at its own level, so an equal operator
     // is absorbed by the recursive call instead.
-    private Expr ParseExpression(int minPrecedence)
+    // Height is the number of operator levels in the returned tree (a lone number is 0).
+    private (Expr Expr, int Height) ParseExpression(int minPrecedence)
     {
-        var left = ParsePrimary();
+        var (left, height) = ParsePrimary();
 
         while (_position < _tokens.Count
             && _tokens[_position] is OperatorToken { Op: var op }
@@ -41,14 +48,24 @@ internal sealed class Parser
         {
             _position++;
             var nextMinPrecedence = IsRightAssociative(op) ? Precedence(op) : Precedence(op) + 1;
-            var right = ParseExpression(nextMinPrecedence);
+
+            EnterNesting();
+            var (right, rightHeight) = ParseExpression(nextMinPrecedence);
+            ExitNesting();
+
+            height = Math.Max(height, rightHeight) + 1;
+            if (height > MaxDepth)
+            {
+                throw new CalcException(CalcErrorKind.ExpressionTooDeep);
+            }
+
             left = new BinaryExpr(op, left, right);
         }
 
-        return left;
+        return (left, height);
     }
 
-    private Expr ParsePrimary()
+    private (Expr Expr, int Height) ParsePrimary()
     {
         if (_position >= _tokens.Count)
         {
@@ -59,11 +76,13 @@ internal sealed class Parser
         {
             case NumberToken number:
                 _position++;
-                return new NumberExpr(number.Value);
+                return (new NumberExpr(number.Value), 0);
 
             case LeftParenToken:
                 _position++;
+                EnterNesting();
                 var inner = ParseExpression(0);
+                ExitNesting();
                 ExpectRightParen();
                 return inner;
 
@@ -71,6 +90,17 @@ internal sealed class Parser
                 throw new CalcException(CalcErrorKind.UnexpectedToken);
         }
     }
+
+    private void EnterNesting()
+    {
+        _nesting++;
+        if (_nesting > MaxDepth)
+        {
+            throw new CalcException(CalcErrorKind.ExpressionTooDeep);
+        }
+    }
+
+    private void ExitNesting() => _nesting--;
 
     private void ExpectRightParen()
     {

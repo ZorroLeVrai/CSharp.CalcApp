@@ -167,7 +167,7 @@ Operator priority and associativity (highest binds tightest):
 2. **Implementation**
    - In `Calculator.cs`: `public static double Evaluate(string input)` chains `Tokenize`, `Parse` and `Evaluate`.
    - Keep the phase classes `internal`; only `Calculator` and `CalcException` are public.
-   - The parser rejects expressions nested deeper than a `MaxDepth` constant (1024, chosen so that even deeply nested input stays well within the default stack) with a `CalcErrorKind.ExpressionTooDeep` error. This matters in .NET because a `StackOverflowException` cannot be caught and would crash the process. Stage 7 also adds `CalcErrorKind.DomainError` (negative base with a fractional exponent whose reduced denominator is even, or a `NaN` result); `0^negative` is `DivisionByZero`; overflow gives infinity.
+   - The parser rejects expressions deeper than a `MaxDepth` constant (1024, chosen so that even deeply nested input stays well within the default stack) with a `CalcErrorKind.ExpressionTooDeep` error. Two things are measured: the parser's recursion nesting (nested parentheses and right-associative `^` chains) and the height of the tree (the evaluator recurses once per level, so a flat `1+1+...` chain is as dangerous as nesting). A chain of 1024 operators is accepted; 1025 is rejected. `Calculator.Evaluate(null)` is treated as empty input (`UnexpectedEnd`). This matters in .NET because a `StackOverflowException` cannot be caught and would crash the process. Stage 7 also adds `CalcErrorKind.DomainError` (negative base with a fractional exponent whose reduced denominator is even, or a `NaN` result); `0^negative` is `DivisionByZero`; overflow gives infinity.
 
 **Milestone:** the basic operators work end to end. Move on to Part 2.
 
@@ -269,7 +269,7 @@ The tree design allows evaluating one parsed expression many times with differen
 - [x] Stage 5: Parser, precedence and associativity
 - [x] Stage 6: Parser, parentheses
 - [x] Stage 7: Evaluator
-- [ ] Stage 8: Public API and end-to-end tests
+- [x] Stage 8: Public API and end-to-end tests
 - [ ] Stage 9: REPL loop
 - [ ] Stage 10: Manual check
 - [ ] Stage 11: Unary minus

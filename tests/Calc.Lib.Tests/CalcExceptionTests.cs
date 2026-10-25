@@ -10,6 +10,7 @@ public class CalcExceptionTests
     [InlineData(CalcErrorKind.UnbalancedParentheses)]
     [InlineData(CalcErrorKind.DivisionByZero)]
     [InlineData(CalcErrorKind.DomainError)]
+    [InlineData(CalcErrorKind.ExpressionTooDeep)]
     public void Kind_IsExposed(CalcErrorKind kind)
     {
         var ex = new CalcException(kind);
@@ -25,6 +26,7 @@ public class CalcExceptionTests
     [InlineData(CalcErrorKind.UnbalancedParentheses)]
     [InlineData(CalcErrorKind.DivisionByZero)]
     [InlineData(CalcErrorKind.DomainError)]
+    [InlineData(CalcErrorKind.ExpressionTooDeep)]
     public void Message_IsReadableForEveryKind(CalcErrorKind kind)
     {
         var ex = new CalcException(kind);

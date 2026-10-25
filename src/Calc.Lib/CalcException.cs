@@ -10,6 +10,7 @@ public enum CalcErrorKind
     UnbalancedParentheses,
     DivisionByZero,
     DomainError,
+    ExpressionTooDeep,
 }
 
 /// <summary>The only exception <c>Calc.Lib</c> throws for invalid user input.</summary>
@@ -32,6 +33,7 @@ public sealed class CalcException : Exception
         CalcErrorKind.UnbalancedParentheses => "Unbalanced parentheses",
         CalcErrorKind.DivisionByZero => "Division by zero",
         CalcErrorKind.DomainError => "Result is not a real number",
+        CalcErrorKind.ExpressionTooDeep => "Expression is nested too deeply",
         _ => "Calculation error",
     };
 }

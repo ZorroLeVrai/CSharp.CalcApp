@@ -223,6 +223,9 @@ Each item follows the same two steps: tokenizer tests then code, parser tests th
    - Evaluate: `-5` -> `-5`, `2--3` -> `5`
 2. **Implementation**
    - Add a `UnaryExpr` record and a `Neg` operation; the parser treats `-` in prefix position as negation.
+   - Precedence: the operand of a prefix `-` takes the `^` operators that follow, so `-2^2` is `-(2^2)` and `2^-3^2` is `2^(-(3^2))`; it leaves `* / + -` to the caller, so `-2*3` is `(-2)*3`. `+` is not a unary operator (`+5` is `UnexpectedToken`).
+   - A negation counts as one level of nesting and one level of tree height, so the depth limit applies to it as well: 1024 consecutive `-` are accepted, 1025 give `ExpressionTooDeep`.
+   - This also makes negative bases directly writable: `(-8)^(1/3)` is `-2`, `-8^(2/3)` is `-4` and `(-8)^(2/3)` is `4`.
 
 ### Stage 12: Modulo
 
@@ -274,8 +277,8 @@ The tree design allows evaluating one parsed expression many times with differen
 - [x] Stage 7: Evaluator
 - [x] Stage 8: Public API and end-to-end tests
 - [x] Stage 9: REPL loop
-- [ ] Stage 10: Manual check
-- [ ] Stage 11: Unary minus
+- [x] Stage 10: Manual check
+- [x] Stage 11: Unary minus
 - [ ] Stage 12: Modulo
 - [ ] Stage 13: Constants
 - [ ] Stage 14: Functions

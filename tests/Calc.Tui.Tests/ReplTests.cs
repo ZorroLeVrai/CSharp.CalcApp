@@ -248,6 +248,26 @@ public class ReplTests
     }
 
     [Theory]
+    [InlineData("-5", "-5")]
+    [InlineData("--5", "5")]
+    [InlineData("2--3", "5")]
+    [InlineData("-2^2", "-4")]
+    [InlineData("(-2)^2", "4")]
+    [InlineData("-(2+3)*4", "-20")]
+    [InlineData("(-8)^(1/3)", "-2")]
+    [InlineData("-10^400", "-inf")]
+    public void Run_UnaryMinus(string line, string expected)
+    {
+        Assert.Equal($"> {expected}\n> ", Run(line + "\nquit\n"));
+    }
+
+    [Fact]
+    public void Run_NegatedZeroPrintsAsZero()
+    {
+        Assert.Equal("> 0\n> ", Run("-0\nquit\n"));
+    }
+
+    [Theory]
     [InlineData("10^400", "inf")]
     [InlineData("0-10^400", "-inf")]
     public void Run_OverflowPrintsInf(string line, string expected)

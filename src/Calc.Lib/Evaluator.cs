@@ -5,8 +5,15 @@ internal static class Evaluator
     public static double Evaluate(Expr expr) => expr switch
     {
         NumberExpr number => number.Value,
+        UnaryExpr unary => Apply(unary.Op, Evaluate(unary.Operand)),
         BinaryExpr binary => Apply(binary.Op, Evaluate(binary.Left), Evaluate(binary.Right)),
         _ => throw new InvalidOperationException($"Unknown expression type {expr.GetType().Name}"),
+    };
+
+    private static double Apply(UnaryOperator op, double operand) => op switch
+    {
+        UnaryOperator.Neg => -operand,
+        _ => throw new ArgumentOutOfRangeException(nameof(op), op, "Unknown operator"),
     };
 
     private static double Apply(Operator op, double left, double right)

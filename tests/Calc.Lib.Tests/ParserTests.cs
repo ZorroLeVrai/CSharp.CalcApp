@@ -539,6 +539,340 @@ public class ParserTests
         Assert.Equal(1000, CountNumbers(expr));
     }
 
+    private static UnaryExpr Neg(Expr operand) => new(UnaryOperator.Neg, operand);
+
+    private static List<Token> Minuses(int count, double num = 0)
+    {
+        var tokens = new List<Token>();
+        tokens.AddRange(Enumerable.Repeat<Token>(Op(Operator.Sub), count));
+        tokens.Add(Num(num));
+        return tokens;
+    }
+
+    [Fact]
+    public void Parse_UnaryMinusOnANumber()
+    {
+        // -5
+        var expr = Parser.Parse([Op(Operator.Sub), Num(5)]);
+
+        Assert.Equal(Neg(N(5)), expr);
+    }
+
+    [Fact]
+    public void Parse_UnaryMinusAfterAnOperator()
+    {
+        // 2*-3
+        var expr = Parser.Parse([Num(2), Op(Operator.Mul), Op(Operator.Sub), Num(3)]);
+
+        Assert.Equal(B(Operator.Mul, N(2), Neg(N(3))), expr);
+    }
+
+    [Fact]
+    public void Parse_UnaryMinusOnAParenthesisedGroup()
+    {
+        // -(2+3)
+        var expr = Parser.Parse([Op(Operator.Sub), LParen(), Num(2), Op(Operator.Add), Num(3), RParen()]);
+
+        Assert.Equal(Neg(B(Operator.Add, N(2), N(3))), expr);
+    }
+
+    [Fact]
+    public void Parse_UnaryMinusInsideParentheses()
+    {
+        // (-2)
+        var expr = Parser.Parse([LParen(), Op(Operator.Sub), Num(2), RParen()]);
+
+        Assert.Equal(Neg(N(2)), expr);
+    }
+
+    [Fact]
+    public void Parse_DoubleUnaryMinus()
+    {
+        // --5
+        var expr = Parser.Parse([Op(Operator.Sub), Op(Operator.Sub), Num(5)]);
+
+        Assert.Equal(Neg(Neg(N(5))), expr);
+    }
+
+    [Fact]
+    public void Parse_TripleUnaryMinus()
+    {
+        var expr = Parser.Parse(Minuses(3, 5));
+
+        Assert.Equal(Neg(Neg(Neg(N(5)))), expr);
+    }
+
+    [Fact]
+    public void Parse_UnaryMinusBindsLooserThanPower()
+    {
+        // -2^2 is -(2^2)
+        var expr = Parser.Parse([Op(Operator.Sub), Num(2), Op(Operator.Pow), Num(2)]);
+
+        Assert.Equal(Neg(B(Operator.Pow, N(2), N(2))), expr);
+    }
+
+    [Fact]
+    public void Parse_ParenthesesMakeTheNegationBindTighterThanPower()
+    {
+        // (-2)^2
+        var expr = Parser.Parse(
+            [LParen(), Op(Operator.Sub), Num(2), RParen(), Op(Operator.Pow), Num(2)]);
+
+        Assert.Equal(B(Operator.Pow, Neg(N(2)), N(2)), expr);
+    }
+
+    [Fact]
+    public void Parse_UnaryMinusInTheExponent()
+    {
+        // 2^-2
+        var expr = Parser.Parse([Num(2), Op(Operator.Pow), Op(Operator.Sub), Num(2)]);
+
+        Assert.Equal(B(Operator.Pow, N(2), Neg(N(2))), expr);
+    }
+
+    [Fact]
+    public void Parse_UnaryMinusOnAPowerWithANegativeExponent()
+    {
+        // -2^-2 is -(2^(-2))
+        var expr = Parser.Parse(
+            [Op(Operator.Sub), Num(2), Op(Operator.Pow), Op(Operator.Sub), Num(2)]);
+
+        Assert.Equal(Neg(B(Operator.Pow, N(2), Neg(N(2)))), expr);
+    }
+
+    [Fact]
+    public void Parse_UnaryMinusInTheExponentTakesTheWholePowerTower()
+    {
+        // 2^-3^2 is 2^(-(3^2))
+        var expr = Parser.Parse(
+            [Num(2), Op(Operator.Pow), Op(Operator.Sub), Num(3), Op(Operator.Pow), Num(2)]);
+
+        Assert.Equal(B(Operator.Pow, N(2), Neg(B(Operator.Pow, N(3), N(2)))), expr);
+    }
+
+    [Theory]
+    [InlineData(Operator.Mul)]
+    [InlineData(Operator.Div)]
+    [InlineData(Operator.Add)]
+    [InlineData(Operator.Sub)]
+    public void Parse_UnaryMinusBindsTighterThanTheOtherBinaryOperators(Operator op)
+    {
+        // -2*3, -2/3, -2+3, -2-3: only the 2 is negated
+        var expr = Parser.Parse([Op(Operator.Sub), Num(2), Op(op), Num(3)]);
+
+        Assert.Equal(B(op, Neg(N(2)), N(3)), expr);
+    }
+
+    [Fact]
+    public void Parse_BinaryMinusFollowedByUnaryMinus()
+    {
+        // 2--3
+        var expr = Parser.Parse([Num(2), Op(Operator.Sub), Op(Operator.Sub), Num(3)]);
+
+        Assert.Equal(B(Operator.Sub, N(2), Neg(N(3))), expr);
+    }
+
+    [Fact]
+    public void Parse_BinaryMinusFollowedByTwoUnaryMinuses()
+    {
+        // 2---3
+        var expr = Parser.Parse(
+            [Num(2), Op(Operator.Sub), Op(Operator.Sub), Op(Operator.Sub), Num(3)]);
+
+        Assert.Equal(B(Operator.Sub, N(2), Neg(Neg(N(3)))), expr);
+    }
+
+    [Fact]
+    public void Parse_UnaryMinusOnBothOperands()
+    {
+        // -2*-3
+        var expr = Parser.Parse(
+            [Op(Operator.Sub), Num(2), Op(Operator.Mul), Op(Operator.Sub), Num(3)]);
+
+        Assert.Equal(B(Operator.Mul, Neg(N(2)), Neg(N(3))), expr);
+    }
+
+    [Fact]
+    public void Parse_UnaryMinusOnAGroupThenAnOperator()
+    {
+        // -(2+3)*4
+        var expr = Parser.Parse(
+            [Op(Operator.Sub), LParen(), Num(2), Op(Operator.Add), Num(3), RParen(), Op(Operator.Mul), Num(4)]);
+
+        Assert.Equal(B(Operator.Mul, Neg(B(Operator.Add, N(2), N(3))), N(4)), expr);
+    }
+
+    [Fact]
+    public void Parse_NegatedGroupInsideANegatedGroup()
+    {
+        // -(-2)
+        var expr = Parser.Parse(
+            [Op(Operator.Sub), LParen(), Op(Operator.Sub), Num(2), RParen()]);
+
+        Assert.Equal(Neg(Neg(N(2))), expr);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void Parse_LoneMinus_Throws(int count)
+    {
+        // - and --
+        var tokens = Enumerable.Repeat<Token>(Op(Operator.Sub), count).ToList();
+
+        var ex = Assert.Throws<CalcException>(() => Parser.Parse(tokens));
+
+        Assert.Equal(CalcErrorKind.UnexpectedEnd, ex.Kind);
+    }
+
+    [Fact]
+    public void Parse_UnaryMinusBeforeAnOperator_Throws()
+    {
+        // -*2
+        var ex = Assert.Throws<CalcException>(
+            () => Parser.Parse([Op(Operator.Sub), Op(Operator.Mul), Num(2)]));
+
+        Assert.Equal(CalcErrorKind.UnexpectedToken, ex.Kind);
+    }
+
+    [Fact]
+    public void Parse_OperatorThenMinusAtTheEnd_Throws()
+    {
+        // 2*-
+        var ex = Assert.Throws<CalcException>(
+            () => Parser.Parse([Num(2), Op(Operator.Mul), Op(Operator.Sub)]));
+
+        Assert.Equal(CalcErrorKind.UnexpectedEnd, ex.Kind);
+    }
+
+    [Fact]
+    public void Parse_UnaryMinusBeforeAClosingParenthesis_Throws()
+    {
+        // (-)
+        var ex = Assert.Throws<CalcException>(
+            () => Parser.Parse([LParen(), Op(Operator.Sub), RParen()]));
+
+        Assert.Equal(CalcErrorKind.UnexpectedToken, ex.Kind);
+    }
+
+    [Fact]
+    public void Parse_UnaryMinusBeforeAnOpeningParenthesisAtTheEnd_Throws()
+    {
+        // -(
+        var ex = Assert.Throws<CalcException>(() => Parser.Parse([Op(Operator.Sub), LParen()]));
+
+        Assert.Equal(CalcErrorKind.UnexpectedEnd, ex.Kind);
+    }
+
+    [Fact]
+    public void Parse_UnaryMinusOnAGroupMissingItsClosingParenthesis_Throws()
+    {
+        // -(2
+        var ex = Assert.Throws<CalcException>(
+            () => Parser.Parse([Op(Operator.Sub), LParen(), Num(2)]));
+
+        Assert.Equal(CalcErrorKind.UnbalancedParentheses, ex.Kind);
+    }
+
+    [Theory]
+    [InlineData(Operator.Add)]
+    [InlineData(Operator.Mul)]
+    [InlineData(Operator.Div)]
+    [InlineData(Operator.Pow)]
+    public void Parse_OtherOperatorsAreNotUnary(Operator op)
+    {
+        // +5, *5, /5, ^5
+        var ex = Assert.Throws<CalcException>(() => Parser.Parse([Op(op), Num(5)]));
+
+        Assert.Equal(CalcErrorKind.UnexpectedToken, ex.Kind);
+    }
+
+    [Fact]
+    public void Parse_UnaryPlusAfterAnOperator_Throws()
+    {
+        // 2*+3
+        var ex = Assert.Throws<CalcException>(
+            () => Parser.Parse([Num(2), Op(Operator.Mul), Op(Operator.Add), Num(3)]));
+
+        Assert.Equal(CalcErrorKind.UnexpectedToken, ex.Kind);
+    }
+
+    [Fact]
+    public void Parse_ThousandAndTwentyFourNegations_Work()
+    {
+        var expr = Parser.Parse(Minuses(1024, 5));
+
+        // the innermost operand is reached after exactly 1024 unary levels
+        var depth = 0;
+        while (expr is UnaryExpr unary)
+        {
+            depth++;
+            expr = unary.Operand;
+        }
+
+        Assert.Equal(1024, depth);
+        Assert.Equal(N(5), expr);
+    }
+
+    [Fact]
+    public void Parse_ThousandAndTwentyFiveNegations_AreTooDeep()
+    {
+        var ex = Assert.Throws<CalcException>(() => Parser.Parse(Minuses(1025)));
+
+        Assert.Equal(CalcErrorKind.ExpressionTooDeep, ex.Kind);
+    }
+
+    [Fact]
+    public void Parse_HugeRunOfNegations_IsRejectedWithoutOverflowingTheStack()
+    {
+        var ex = Assert.Throws<CalcException>(() => Parser.Parse(Minuses(1_000_000)));
+
+        Assert.Equal(CalcErrorKind.ExpressionTooDeep, ex.Kind);
+    }
+
+    [Fact]
+    public void Parse_ChainOfNegatedTermsInsideTheLimit_Works()
+    {
+        // 1 + -1 + -1 ... with 600 negated terms: the chain is 600 levels tall, within the limit
+        var tokens = new List<Token> { Num(1) };
+        for (var i = 0; i < 600; i++)
+        {
+            tokens.Add(Op(Operator.Add));
+            tokens.Add(Op(Operator.Sub));
+            tokens.Add(Num(1));
+        }
+
+        var expr = Parser.Parse(tokens);
+
+        Assert.Equal(601, CountNumbers(expr));
+    }
+
+    [Fact]
+    public void Parse_TallChainOfNegatedTerms_IsTooDeep()
+    {
+        // 1 + -1 + -1 ... with 1100 terms: each Add level is one level taller, so the chain exceeds the limit
+        var tokens = new List<Token> { Num(1) };
+        for (var i = 0; i < 1100; i++)
+        {
+            tokens.Add(Op(Operator.Add));
+            tokens.Add(Op(Operator.Sub));
+            tokens.Add(Num(1));
+        }
+
+        var ex = Assert.Throws<CalcException>(() => Parser.Parse(tokens));
+
+        Assert.Equal(CalcErrorKind.ExpressionTooDeep, ex.Kind);
+    }
+
+    [Fact]
+    public void Parse_CountNumbers_IncludesNumbersUnderNegations()
+    {
+        // the helper must walk through UnaryExpr nodes: -(1+2) has two numbers
+        var expr = Parser.Parse([Op(Operator.Sub), LParen(), Num(1), Op(Operator.Add), Num(2), RParen()]);
+
+        Assert.Equal(2, CountNumbers(expr));
+    }
+
     private static List<Token> NestedParentheses(int depth, double num = 0)
     {
         var tokens = new List<Token>();
@@ -577,6 +911,9 @@ public class ParserTests
                 case BinaryExpr binary:
                     pending.Push(binary.Left);
                     pending.Push(binary.Right);
+                    break;
+                case UnaryExpr unary:
+                    pending.Push(unary.Operand);
                     break;
             }
         }

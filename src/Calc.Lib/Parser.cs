@@ -54,10 +54,7 @@ internal sealed class Parser
             ExitNesting();
 
             height = Math.Max(height, rightHeight) + 1;
-            if (height > MaxDepth)
-            {
-                throw new CalcException(CalcErrorKind.ExpressionTooDeep);
-            }
+            CheckHeight(height);
 
             left = new BinaryExpr(op, left, right);
         }
@@ -86,6 +83,17 @@ internal sealed class Parser
                 ExpectRightParen();
                 return inner;
 
+            // "-" in prefix position. Its operand takes the ^ operators that follow (-2^2 is -(2^2)) but
+            // not * / + -, which are left to the caller (-2*3 is (-2)*3). The operand may itself start
+            // with "-" (--5, 2^-3).
+            case OperatorToken { Op: Operator.Sub }:
+                _position++;
+                EnterNesting();
+                var (operand, operandHeight) = ParseExpression(Precedence(Operator.Pow));
+                ExitNesting();
+                CheckHeight(operandHeight + 1);
+                return (new UnaryExpr(UnaryOperator.Neg, operand), operandHeight + 1);
+
             default:
                 throw new CalcException(CalcErrorKind.UnexpectedToken);
         }
@@ -101,6 +109,14 @@ internal sealed class Parser
     }
 
     private void ExitNesting() => _nesting--;
+
+    private static void CheckHeight(int height)
+    {
+        if (height > MaxDepth)
+        {
+            throw new CalcException(CalcErrorKind.ExpressionTooDeep);
+        }
+    }
 
     private void ExpectRightParen()
     {

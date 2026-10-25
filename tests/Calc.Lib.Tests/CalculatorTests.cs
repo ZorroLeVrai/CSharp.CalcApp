@@ -28,6 +28,78 @@ public class CalculatorTests
     }
 
     [Theory]
+    [InlineData("-5", -5)]
+    [InlineData("--5", 5)]
+    [InlineData("2*-3", -6)]
+    [InlineData("2--3", 5)]
+    [InlineData("-(2+3)", -5)]
+    [InlineData("-(2+3)*4", -20)]
+    [InlineData("-2^2", -4)]
+    [InlineData("(-2)^2", 4)]
+    [InlineData("2^-1", 0.5)]
+    [InlineData("10/-4", -2.5)]
+    [InlineData("- 5", -5)]
+    [InlineData("1 - -1", 2)]
+    public void Evaluate_UnaryMinus(string input, double expected)
+    {
+        Assert.Equal(expected, Calculator.Evaluate(input), Precision);
+    }
+
+    [Fact]
+    public void Evaluate_NegativeBaseWrittenWithUnaryMinus_IsReal()
+    {
+        Assert.Equal(-2, Calculator.Evaluate("(-8)^(1/3)"), Precision);
+        Assert.Equal(4, Calculator.Evaluate("(-8)^(2/3)"), Precision);
+        Assert.Equal(-4, Calculator.Evaluate("-8^(2/3)"), Precision);
+    }
+
+    [Theory]
+    [InlineData("-", CalcErrorKind.UnexpectedEnd)]
+    [InlineData("--", CalcErrorKind.UnexpectedEnd)]
+    [InlineData("2*-", CalcErrorKind.UnexpectedEnd)]
+    [InlineData("-*2", CalcErrorKind.UnexpectedToken)]
+    [InlineData("(-)", CalcErrorKind.UnexpectedToken)]
+    [InlineData("+5", CalcErrorKind.UnexpectedToken)]
+    [InlineData("2*+3", CalcErrorKind.UnexpectedToken)]
+    [InlineData("-(2", CalcErrorKind.UnbalancedParentheses)]
+    [InlineData("1/-0", CalcErrorKind.DivisionByZero)]
+    [InlineData("(-4)^(1/2)", CalcErrorKind.DomainError)]
+    public void Evaluate_UnaryMinusErrors(string input, CalcErrorKind expected)
+    {
+        var ex = Assert.Throws<CalcException>(() => Calculator.Evaluate(input));
+
+        Assert.Equal(expected, ex.Kind);
+    }
+
+    [Fact]
+    public void Evaluate_ThousandAndTwentyFourNegations_Work()
+    {
+        var input = new string('-', 1024) + "5";
+
+        Assert.Equal(5, Calculator.Evaluate(input));
+    }
+
+    [Fact]
+    public void Evaluate_ThousandAndTwentyFiveNegations_AreTooDeep()
+    {
+        var input = new string('-', 1025) + "5";
+
+        var ex = Assert.Throws<CalcException>(() => Calculator.Evaluate(input));
+
+        Assert.Equal(CalcErrorKind.ExpressionTooDeep, ex.Kind);
+    }
+
+    [Fact]
+    public void Evaluate_MillionNegations_AreRejectedInsteadOfCrashing()
+    {
+        var input = new string('-', 1_000_000) + "5";
+
+        var ex = Assert.Throws<CalcException>(() => Calculator.Evaluate(input));
+
+        Assert.Equal(CalcErrorKind.ExpressionTooDeep, ex.Kind);
+    }
+
+    [Theory]
     [InlineData(" 2 + 3 ")]
     [InlineData("\t2\n+\r3")]
     [InlineData("2+3")]

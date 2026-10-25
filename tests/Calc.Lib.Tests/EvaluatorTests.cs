@@ -9,6 +9,8 @@ public class EvaluatorTests
 
     private static BinaryExpr B(Operator op, Expr left, Expr right) => new(op, left, right);
 
+    private static UnaryExpr Neg(Expr operand) => new(UnaryOperator.Neg, operand);
+
     private static double EvalSource(string input) => Evaluator.Evaluate(Parser.Parse(Tokenizer.Tokenize(input)));
 
     [Fact]
@@ -292,6 +294,135 @@ public class EvaluatorTests
         var input = string.Join("+", Enumerable.Repeat("2*3", 683));
 
         Assert.Equal(683 * 6, EvalSource(input));
+    }
+
+    [Theory]
+    [InlineData(5, -5)]
+    [InlineData(-3.5, 3.5)]
+    [InlineData(0.25, -0.25)]
+    [InlineData(double.PositiveInfinity, double.NegativeInfinity)]
+    [InlineData(double.NegativeInfinity, double.PositiveInfinity)]
+    public void Evaluate_Negation(double operand, double expected)
+    {
+        Assert.Equal(expected, Evaluator.Evaluate(Neg(N(operand))));
+    }
+
+    [Fact]
+    public void Evaluate_DoubleNegationCancelsOut()
+    {
+        Assert.Equal(5, Evaluator.Evaluate(Neg(Neg(N(5)))));
+    }
+
+    [Fact]
+    public void Evaluate_NegationOfZero_IsZero()
+    {
+        Assert.Equal(0, Evaluator.Evaluate(Neg(N(0))));
+    }
+
+    [Fact]
+    public void Evaluate_NegationInsideABinaryOperation()
+    {
+        // 2 - (-3)
+        var tree = B(Operator.Sub, N(2), Neg(N(3)));
+
+        Assert.Equal(5, Evaluator.Evaluate(tree));
+    }
+
+    [Fact]
+    public void Evaluate_NegationOfAGroup()
+    {
+        // -(2+3)
+        var tree = Neg(B(Operator.Add, N(2), N(3)));
+
+        Assert.Equal(-5, Evaluator.Evaluate(tree));
+    }
+
+    [Fact]
+    public void Evaluate_ErrorsInsideANegatedOperandStillSurface()
+    {
+        // -(1/0)
+        var tree = Neg(B(Operator.Div, N(1), N(0)));
+
+        var ex = Assert.Throws<CalcException>(() => Evaluator.Evaluate(tree));
+
+        Assert.Equal(CalcErrorKind.DivisionByZero, ex.Kind);
+    }
+
+    [Fact]
+    public void Evaluate_DividingByANegativeZero_IsDivisionByZero()
+    {
+        // 1/-0
+        var tree = B(Operator.Div, N(1), Neg(N(0)));
+
+        var ex = Assert.Throws<CalcException>(() => Evaluator.Evaluate(tree));
+
+        Assert.Equal(CalcErrorKind.DivisionByZero, ex.Kind);
+    }
+
+    [Theory]
+    [InlineData("-5", -5)]
+    [InlineData("--5", 5)]
+    [InlineData("---5", -5)]
+    [InlineData("2--3", 5)]
+    [InlineData("2---3", -1)]
+    [InlineData("2*-3", -6)]
+    [InlineData("-2*-3", 6)]
+    [InlineData("-(2+3)", -5)]
+    [InlineData("-(2+3)*4", -20)]
+    [InlineData("-(-2)", 2)]
+    [InlineData("10/-4", -2.5)]
+    [InlineData("1-1-1", -1)]
+    [InlineData("-2+3", 1)]
+    [InlineData("-2-3", -5)]
+    public void Evaluate_UnaryMinusFromSource(string input, double expected)
+    {
+        Assert.Equal(expected, EvalSource(input));
+    }
+
+    [Theory]
+    [InlineData("-2^2", -4)]
+    [InlineData("(-2)^2", 4)]
+    [InlineData("-(2^2)", -4)]
+    [InlineData("2^-1", 0.5)]
+    [InlineData("2^-2", 0.25)]
+    [InlineData("-2^-2", -0.25)]
+    [InlineData("-2^3", -8)]
+    [InlineData("(-2)^3", -8)]
+    [InlineData("2^-3^2", 0.001953125)]
+    [InlineData("-2^2^2", -16)]
+    public void Evaluate_UnaryMinusAndPower(string input, double expected)
+    {
+        Assert.Equal(expected, EvalSource(input), Precision);
+    }
+
+    [Theory]
+    [InlineData("(-8)^(1/3)", -2)]
+    [InlineData("(-8)^(2/3)", 4)]
+    [InlineData("-8^(2/3)", -4)]
+    [InlineData("-8^(1/3)", -2)]
+    [InlineData("-(-8)^(1/3)", 2)]
+    [InlineData("(-27)^(1/3)", -3)]
+    [InlineData("(-32)^(3/5)", -8)]
+    [InlineData("(-8)^(-1/3)", -0.5)]
+    [InlineData("(-8)^(2/6)", -2)]
+    public void Evaluate_NegativeBaseWritten_WithUnaryMinus(string input, double expected)
+    {
+        Assert.Equal(expected, EvalSource(input), Precision);
+    }
+
+    [Theory]
+    [InlineData("(-4)^(1/2)", CalcErrorKind.DomainError)]
+    [InlineData("(-8)^(1/6)", CalcErrorKind.DomainError)]
+    [InlineData("(-8)^0.3333", CalcErrorKind.DomainError)]
+    [InlineData("1/-0", CalcErrorKind.DivisionByZero)]
+    [InlineData("1/(-0)", CalcErrorKind.DivisionByZero)]
+    [InlineData("0^-1", CalcErrorKind.DivisionByZero)]
+    [InlineData("(-0)^-1", CalcErrorKind.DivisionByZero)]
+    public void Evaluate_ErrorsWithUnaryMinus(string input, CalcErrorKind expected)
+    {
+        var ex = Assert.Throws<CalcException>(() => EvalSource(input));
+
+        Assert.Equal(expected, ex.Kind);
     }
 
     [Fact]

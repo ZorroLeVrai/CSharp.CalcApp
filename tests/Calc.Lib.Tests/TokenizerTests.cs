@@ -106,6 +106,64 @@ public class TokenizerTests
     }
 
     [Fact]
+    public void Tokenize_Parentheses()
+    {
+        var tokens = Tokenizer.Tokenize("(2+3)*4");
+
+        Assert.Equal(
+            new Token[]
+            {
+                new LeftParenToken(),
+                new NumberToken(2), new OperatorToken(Operator.Add), new NumberToken(3),
+                new RightParenToken(),
+                new OperatorToken(Operator.Mul), new NumberToken(4),
+            },
+            tokens);
+    }
+
+    [Fact]
+    public void Tokenize_NestedParentheses()
+    {
+        var tokens = Tokenizer.Tokenize("((1))");
+
+        Assert.Equal(
+            new Token[]
+            {
+                new LeftParenToken(), new LeftParenToken(),
+                new NumberToken(1),
+                new RightParenToken(), new RightParenToken(),
+            },
+            tokens);
+    }
+
+    [Fact]
+    public void Tokenize_IgnoresWhitespaceAroundParentheses()
+    {
+        Assert.Equal(Tokenizer.Tokenize("(2+3)*4"), Tokenizer.Tokenize(" ( 2 + 3 ) * 4 "));
+    }
+
+    [Theory]
+    [InlineData("(", 1, 0)]
+    [InlineData(")", 0, 1)]
+    [InlineData("(()", 2, 1)]
+    [InlineData("())", 1, 2)]
+    public void Tokenize_DoesNotCheckBalance(string input, int open, int close)
+    {
+        var tokens = Tokenizer.Tokenize(input);
+
+        Assert.Equal(open, tokens.OfType<LeftParenToken>().Count());
+        Assert.Equal(close, tokens.OfType<RightParenToken>().Count());
+    }
+
+    [Fact]
+    public void Tokenize_EmptyParentheses_GiveTwoTokens()
+    {
+        Assert.Equal(
+            new Token[] { new LeftParenToken(), new RightParenToken() },
+            Tokenizer.Tokenize("()"));
+    }
+
+    [Fact]
     public void Tokenize_IsCultureIndependent()
     {
         var previous = CultureInfo.CurrentCulture;

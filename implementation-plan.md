@@ -262,7 +262,7 @@ The tree design allows evaluating one parsed expression many times with differen
 
 - [x] Stage 1: Error type
 - [x] Stage 2: Tokenizer, numbers and operators
-- [ ] Stage 3: Tokenizer, parentheses
+- [x] Stage 3: Tokenizer, parentheses
 - [ ] Stage 4: Parser, single operations
 - [ ] Stage 5: Parser, precedence and associativity
 - [ ] Stage 6: Parser, parentheses

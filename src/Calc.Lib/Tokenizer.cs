@@ -27,6 +27,16 @@ internal static class Tokenizer
 
                 tokens.Add(new NumberToken(ParseNumber(input[start..charIndex])));
             }
+            else if (c == '(')
+            {
+                tokens.Add(new LeftParenToken());
+                charIndex++;
+            }
+            else if (c == ')')
+            {
+                tokens.Add(new RightParenToken());
+                charIndex++;
+            }
             else if (TryGetOperator(c, out var op))
             {
                 tokens.Add(new OperatorToken(op));
